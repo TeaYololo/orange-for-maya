@@ -1,0 +1,53 @@
+name: Bug report / Hata bildirimi
+description: Something does not work like Blender (or breaks Maya). / Bir şey Blender'daki gibi çalışmıyor ya da Maya'yı bozuyor.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Tip:** In Maya, open the **Orange** menu → **Report an issue**. It copies your Maya, Python, Qt and keyboard details to the clipboard; paste them below.
+        **İpucu:** Maya'da **Orange** menüsü → **Sorun bildir**. Maya, Python, Qt ve klavye bilgilerini panoya kopyalar; aşağıya yapıştır.
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics / Tanılama bilgisi
+      description: Paste from Orange menu → Report an issue. / Orange menüsü → Sorun bildir çıktısını yapıştır.
+      render: text
+    validations:
+      required: true
+  - type: dropdown
+    id: maya
+    attributes:
+      label: Maya version / Maya sürümü
+      options: ["2027", "2026", "2025", "2024", "2023", "2022", "other / diğer"]
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system / İşletim sistemi
+      options: ["Windows", "macOS", "Linux (X11)", "Linux (Wayland / XWayland)"]
+    validations:
+      required: true
+  - type: input
+    id: keyboard
+    attributes:
+      label: Keyboard layout / Klavye düzeni
+      placeholder: "US, Turkish Q, German, laptop without numpad..."
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do, what did you expect? / Ne yaptın, ne bekliyordun?
+      placeholder: |
+        1. Tab into edit mode, select an edge loop
+        2. Ctrl+R ...
+        Expected (Blender): ...
+        Happened (Maya): ...
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Script Editor output / Script Editor çıktısı
+      description: Lines starting with [Orange] or a Python traceback. / [Orange] ile başlayan satırlar ya da Python hata çıktısı.
+      render: text

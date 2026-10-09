@@ -1,0 +1,30 @@
+name: Key does not work (macOS / Linux / other layout) / Tuş çalışmıyor
+description: A key is not recognized on your keyboard. Help us fix the key tables. / Bir tuş tanınmıyor; tuş tablolarını düzeltmemize yardım et.
+labels: [keyboard, platform]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        In Maya: **Orange** menu → **Key test**. Press the key that does not work and copy the line it shows.
+        Maya'da: **Orange** menüsü → **Tuş testi**. Çalışmayan tuşa bas ve gösterilen satırı kopyala.
+  - type: textarea
+    id: keytest
+    attributes:
+      label: Key test output / Tuş testi çıktısı
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Which Blender key did you press? / Hangi Blender tuşuna bastın?
+      placeholder: "Numpad 7, Tab, ` (grave) ..."
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system / İşletim sistemi
+      options: ["Windows", "macOS", "Linux (X11)", "Linux (Wayland / XWayland)"]
+    validations:
+      required: true

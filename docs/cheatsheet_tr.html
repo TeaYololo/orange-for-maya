@@ -1,0 +1,180 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Orange kısayol kartı</title><style>
+:root { --accent: #e8730c; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e4e7; --bg: #ffffff; --kbd: #f4f4f5; }
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #ececef; --muted: #a1a1aa; --line: #34343a; --bg: #18181b; --kbd: #27272a; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--ink);
+       font: 13px/1.4 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; border-bottom: 3px solid var(--accent);
+         padding-bottom: 8px; margin-bottom: 16px; }
+h1 { margin: 0; font-size: 22px; } h1 span { color: var(--accent); }
+.tag { color: var(--muted); }
+main { columns: 3 300px; column-gap: 24px; }
+section { break-inside: avoid; margin: 0 0 18px; }
+h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); margin: 0 0 6px; }
+table { width: 100%; border-collapse: collapse; }
+td { padding: 3px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.k { white-space: nowrap; padding-right: 10px; width: 1%; }
+kbd { font: 11px/1 ui-monospace, Consolas, monospace; background: var(--kbd); border: 1px solid var(--line);
+      border-bottom-width: 2px; border-radius: 4px; padding: 2px 5px; }
+footer { color: var(--muted); margin-top: 8px; font-size: 11px; }
+@media print { body { padding: 0; } main { columns: 3; } }
+</style></head><body><header><h1><span>Orange</span> kısayol kartı</h1><span class="tag">Maya, the Blender way · v0.9.0</span></header><main><section><h2>Modlar ve seçim</h2><table><tr><td class="k"><kbd>Tab</kbd></td><td>Edit modu aç/kapa</td></tr>
+<tr><td class="k"><kbd>1</kbd></td><td>Köşe modu</td></tr>
+<tr><td class="k"><kbd>2</kbd></td><td>Kenar modu</td></tr>
+<tr><td class="k"><kbd>3</kbd></td><td>Yüz modu</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>1</kbd></td><td>Köşe modunu ekle / çıkar (çoklu mod)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>2</kbd></td><td>Kenar modunu ekle / çıkar (çoklu mod)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>3</kbd></td><td>Yüz modunu ekle / çıkar (çoklu mod)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>G</kbd></td><td>Benzerini seç / grupla seç</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>M</kbd></td><td>Ayna seçimi (Select Mirror)</td></tr>
+<tr><td class="k"><kbd>B</kbd></td><td>Kutu seçimi</td></tr>
+<tr><td class="k"><kbd>A</kbd></td><td>Hepsini seç</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>A</kbd></td><td>Seçimi kaldır</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>I</kbd></td><td>Seçimi ters çevir</td></tr>
+<tr><td class="k"><kbd>W</kbd></td><td>Seçim aracı döngüsü (kutu / kement / fırça)</td></tr>
+<tr><td class="k"><kbd>C</kbd></td><td>Fırça ile seç (Circle select)</td></tr>
+<tr><td class="k"><kbd>L</kbd></td><td>Bağlı olanları seç (imleç altı)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>L</kbd></td><td>Bağlı olanları seçimden çıkar</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>X</kbd></td><td>Erit (Dissolve) / Kes</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>1</kbd></td><td>Yumuşak önizleme 1 / köşe moduna genişleterek</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>2</kbd></td><td>Yumuşak önizleme 2 / kenar moduna genişleterek</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>3</kbd></td><td>Yumuşak önizleme 3 / yüz moduna genişleterek</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Np</kbd>+<kbd></kbd></td><td>Seçimi büyüt</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad -</kbd></td><td>Seçimi küçült</td></tr></table></section>
+<section><h2>Dönüşüm (G / R / S)</h2><table><tr><td class="k"><kbd>G</kbd></td><td>Taşı (Grab)</td></tr>
+<tr><td class="k"><kbd>R</kbd></td><td>Döndür (Rotate)</td></tr>
+<tr><td class="k"><kbd>S</kbd></td><td>Ölçekle (Scale)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>S</kbd></td><td>Hizala (Snap) pie</td></tr>
+<tr><td class="k"><kbd>E</kbd></td><td>Extrude</td></tr>
+<tr><td class="k"><kbd>I</kbd></td><td>Inset / Keyframe ekle</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>B</kbd></td><td>Bevel</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></td><td>Köşe bevel</td></tr>
+<tr><td class="k"><kbd>.</kbd></td><td>Pivot noktası pie</td></tr>
+<tr><td class="k"><kbd>,</kbd></td><td>Dönüşüm oryantasyonu pie</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Snap aç/kapa</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Tab</kbd></td><td>Snap hedefi (artım/köşe/kenar/yüz)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>M</kbd></td><td>Aynala (Mirror)</td></tr></table></section>
+<section><h2>Edit modu (mesh)</h2><table><tr><td class="k"><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>S</kbd></td><td>Küreye çevir (To Sphere)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>E</kbd></td><td>Kenar crease</td></tr>
+<tr><td class="k"><kbd>U</kbd></td><td>UV menüsü</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>O</kbd></td><td>Proportional falloff pie</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>O</kbd></td><td>Proportional: sadece bağlı</td></tr>
+<tr><td class="k"><kbd>O</kbd></td><td>Proportional editing (soft select)</td></tr>
+<tr><td class="k"><kbd>X</kbd></td><td>Sil (Delete)</td></tr>
+<tr><td class="k"><kbd>Delete</kbd></td><td>Sil (menüsüz)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Extrude menüsü (normaller boyunca, tek tek...)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>R</kbd></td><td>Loop cut</td></tr>
+<tr><td class="k"><kbd>K</kbd></td><td>Bıçak (Knife / Multi-Cut)</td></tr>
+<tr><td class="k"><kbd>F</kbd></td><td>Yüz/kenar doldur (Fill)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>F</kbd></td><td>Doldur ve üçgenle (Fill)</td></tr>
+<tr><td class="k"><kbd>J</kbd></td><td>Köşeleri bağla (Connect)</td></tr>
+<tr><td class="k"><kbd>V</kbd></td><td>Rip</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>V</kbd></td><td>Köşe kaydır (Vertex Slide)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Kenar menüsü (köprü, dikiş, crease, kaydır)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Köşe menüsü</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>F</kbd></td><td>Yüz menüsü (poke, solidify, mirror)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>T</kbd></td><td>Üçgene çevir (Triangulate)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>J</kbd></td><td>Dörtgene çevir (Tris to Quads)</td></tr>
+<tr><td class="k"><kbd>M</kbd></td><td>Birleştir (Merge) / Layer'a taşı</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>M</kbd></td><td>Ayır - Split menüsü</td></tr>
+<tr><td class="k"><kbd>P</kbd></td><td>Ayır (Separate)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Delete</kbd></td><td>Erit (Dissolve)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>N</kbd></td><td>Normalleri dışa hesapla</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd></td><td>Normalleri içe hesapla</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>N</kbd></td><td>Normal menüsü (çevir, ortala, kilidi aç)</td></tr></table></section>
+<section><h2>Obje modu</h2><table><tr><td class="k"><kbd>Ctrl</kbd>+<kbd>L</kbd></td><td>Bağlı olanları seç / bağla-aktar (obje)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>G</kbd></td><td>Konumu sıfırla</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>R</kbd></td><td>Döndürmeyi sıfırla</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>S</kbd></td><td>Ölçeği sıfırla / kalınlaştır-incelt (edit)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Uygula (Apply / Freeze)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>D</kbd></td><td>Kopyala (Duplicate)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>D</kbd></td><td>Instance (Duplicate Linked)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>A</kbd></td><td>Ekle (Add)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>J</kbd></td><td>Birleştir (Join objects)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Ebeveyn yap (Parent)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>P</kbd></td><td>Ebeveyni kaldır</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>G</kbd></td><td>Yeni layer (New Collection)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd></td><td>Origin ayarla (Set Origin)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>Q</kbd></td><td>Transfer mode (imleç altındaki objeyi düzenle)</td></tr>
+<tr><td class="k"><kbd>H</kbd></td><td>Gizle</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>H</kbd></td><td>Diğerlerini gizle</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>H</kbd></td><td>Hepsini göster</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>F2</kbd></td><td>Toplu yeniden adlandır</td></tr>
+<tr><td class="k"><kbd>F2</kbd></td><td>Yeniden adlandır</td></tr></table></section>
+<section><h2>Görünüm</h2><table><tr><td class="k"><kbd>Ctrl</kbd>+<kbd>0</kbd></td><td>Yumuşak önizleme kapalı</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>4</kbd></td><td>Yumuşak önizleme 4</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>5</kbd></td><td>Yumuşak önizleme 5</td></tr>
+<tr><td class="k"><kbd>Numpad 1</kbd></td><td>Ön görünüm</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 1</kbd></td><td>Arka görünüm</td></tr>
+<tr><td class="k"><kbd>Numpad 3</kbd></td><td>Sağ görünüm</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 3</kbd></td><td>Sol görünüm</td></tr>
+<tr><td class="k"><kbd>Numpad 7</kbd></td><td>Üst görünüm</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 7</kbd></td><td>Alt görünüm</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Numpad 1</kbd></td><td>Ön görünüm (objenin lokal ekseni)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Numpad 1</kbd></td><td>Arka görünüm (lokal)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Numpad 3</kbd></td><td>Sağ görünüm (lokal)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Numpad 3</kbd></td><td>Sol görünüm (lokal)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Numpad 7</kbd></td><td>Üst görünüm (lokal)</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Numpad 7</kbd></td><td>Alt görünüm (lokal)</td></tr>
+<tr><td class="k"><kbd>Numpad 9</kbd></td><td>Görünümü ters çevir (180°)</td></tr>
+<tr><td class="k"><kbd>Numpad 5</kbd></td><td>Perspektif / Ortografik</td></tr>
+<tr><td class="k"><kbd>Numpad 0</kbd></td><td>Kameradan bak</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 0</kbd></td><td>Seçili kamerayı aktif yap</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Numpad 0</kbd></td><td>Kamerayı görünüme hizala</td></tr>
+<tr><td class="k"><kbd>Numpad .</kbd></td><td>Seçime odaklan</td></tr>
+<tr><td class="k"><kbd>Home</kbd></td><td>Hepsini göster (Frame All)</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>C</kbd></td><td>İmleci sıfırla ve hepsini göster</td></tr>
+<tr><td class="k"><kbd>Numpad /</kbd></td><td>Local view (isolate)</td></tr>
+<tr><td class="k"><kbd>Numpad 2</kbd></td><td>Aşağı döndür</td></tr>
+<tr><td class="k"><kbd>Numpad 8</kbd></td><td>Yukarı döndür</td></tr>
+<tr><td class="k"><kbd>Numpad 4</kbd></td><td>Sola döndür</td></tr>
+<tr><td class="k"><kbd>Numpad 6</kbd></td><td>Sağa döndür</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 2</kbd></td><td>Aşağı kaydır</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 8</kbd></td><td>Yukarı kaydır</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 4</kbd></td><td>Sola kaydır</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Numpad 6</kbd></td><td>Sağa kaydır</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Numpad 4</kbd></td><td>Görünümü sola yatır</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Numpad 6</kbd></td><td>Görünümü sağa yatır</td></tr>
+<tr><td class="k"><kbd>Np</kbd>+<kbd></kbd></td><td>Yakınlaş</td></tr>
+<tr><td class="k"><kbd>Numpad -</kbd></td><td>Uzaklaş</td></tr>
+<tr><td class="k"><kbd>`</kbd></td><td>Görünüm pie</td></tr>
+<tr><td class="k"><kbd>Z</kbd></td><td>Görüntü (shading) pie</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>PageUp</kbd></td><td>Önceki çalışma alanı</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>PageDown</kbd></td><td>Sonraki çalışma alanı</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>`</kbd></td><td>Walk navigasyonu</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Wireframe aç/kapa</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>Z</kbd></td><td>X-Ray aç/kapa</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Paneli büyüt</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Araç pie</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Q</kbd></td><td>Dörtlü görünüm (Quad View)</td></tr>
+<tr><td class="k"><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Overlay aç/kapa</td></tr></table></section>
+<section><h2>Animasyon</h2><table><tr><td class="k"><kbd>Alt</kbd>+<kbd>I</kbd></td><td>Keyframe sil</td></tr>
+<tr><td class="k"><kbd>Space</kbd></td><td>Oynat / durdur</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Space</kbd></td><td>Ters oynat / durdur</td></tr>
+<tr><td class="k"><kbd>Left</kbd></td><td>Önceki kare</td></tr>
+<tr><td class="k"><kbd>Right</kbd></td><td>Sonraki kare</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Left</kbd></td><td>Başa git</td></tr>
+<tr><td class="k"><kbd>Shift</kbd>+<kbd>Right</kbd></td><td>Sona git</td></tr>
+<tr><td class="k"><kbd>Up</kbd></td><td>Sonraki keyframe</td></tr>
+<tr><td class="k"><kbd>Down</kbd></td><td>Önceki keyframe</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Home</kbd></td><td>Aralık başı = geçerli kare</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>End</kbd></td><td>Aralık sonu = geçerli kare</td></tr></table></section>
+<section><h2>Sculpt ve boyama</h2><table><tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Tab</kbd></td><td>Mod pie (seçim, sculpt, boyama)</td></tr></table></section>
+<section><h2>Genel</h2><table><tr><td class="k"><kbd>Shift</kbd>+<kbd>R</kbd></td><td>Son işlemi tekrarla</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd></td><td>Ofset kenar halkası</td></tr>
+<tr><td class="k"><kbd>Q</kbd></td><td>Favoriler (Quick Favorites)</td></tr>
+<tr><td class="k"><kbd>N</kbd></td><td>Channel Box aç/kapa</td></tr>
+<tr><td class="k"><kbd>T</kbd></td><td>Araç çubuğu aç/kapa</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Yinele (Redo)</td></tr>
+<tr><td class="k"><kbd>F11</kbd></td><td>Render penceresi</td></tr>
+<tr><td class="k"><kbd>F12</kbd></td><td>Render</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>F12</kbd></td><td>Animasyonu render et (batch)</td></tr>
+<tr><td class="k"><kbd>F1</kbd></td><td>Kısayol listesi</td></tr>
+<tr><td class="k"><kbd>F3</kbd></td><td>Komut ara</td></tr>
+<tr><td class="k"><kbd>F9</kbd></td><td>Son işlemi ayarla</td></tr>
+<tr><td class="k"><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>Ayarlar ve kısayollar</td></tr></table></section>
+<section><h2>Sculpt modu</h2><p><kbd>Alt</kbd>+<kbd>M</kbd> <kbd>C</kbd> <kbd>Ctrl</kbd>+<kbd>I</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>I</kbd> <kbd>K</kbd> <kbd>M</kbd> <kbd>P</kbd> <kbd>S</kbd> <kbd>Shift</kbd>+<kbd>C</kbd> <kbd>Shift</kbd>+<kbd>F</kbd> <kbd>Shift</kbd>+<kbd>T</kbd> <kbd>Tab</kbd> <kbd>V</kbd></p></section>
+<section><h2>UV editörü</h2><p><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> <kbd>A</kbd> <kbd>Alt</kbd>+<kbd>A</kbd> <kbd>Alt</kbd>+<kbd>P</kbd> <kbd>Alt</kbd>+<kbd>V</kbd> <kbd>Ctrl</kbd>+<kbd>I</kbd> <kbd>Ctrl</kbd>+<kbd>L</kbd> <kbd>G</kbd> <kbd>L</kbd> <kbd>P</kbd> <kbd>R</kbd> <kbd>S</kbd> <kbd>Shift</kbd>+<kbd>S</kbd> <kbd>Shift</kbd>+<kbd>W</kbd> <kbd>U</kbd> <kbd>V</kbd> <kbd>Y</kbd></p></section>
+<section><h2>Graph Editor / Dope Sheet</h2><p><kbd>A</kbd> <kbd>Alt</kbd>+<kbd>A</kbd> <kbd>Delete</kbd> <kbd>G</kbd> <kbd>Home</kbd> <kbd>Numpad .</kbd> <kbd>P</kbd> <kbd>S</kbd> <kbd>Shift</kbd>+<kbd>E</kbd> <kbd>T</kbd> <kbd>V</kbd> <kbd>X</kbd></p></section></main><footer>Fare 3D görünümün üzerindeyken çalışır. F1: ayrıntılı liste, F3: komut ara, Ctrl+,: ayarlar.</footer></body></html>

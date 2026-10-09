@@ -1,0 +1,21 @@
+name: Missing Blender feature / Eksik Blender özelliği
+description: A Blender key, tool or workflow you miss in Maya. / Maya'da özlediğin bir Blender tuşu, aracı ya da akışı.
+labels: [enhancement]
+body:
+  - type: input
+    id: blender
+    attributes:
+      label: Blender key or operator / Blender tuşu ya da komutu
+      placeholder: "Shift+Ctrl+Alt+S shear, K knife project, ..."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: How do you use it? / Nasıl kullanıyorsun?
+    validations:
+      required: true
+  - type: textarea
+    id: maya
+    attributes:
+      label: Maya equivalent you know of (optional) / Bildiğin Maya karşılığı (isteğe bağlı)

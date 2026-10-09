@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      maya:
+        description: "Also run mayapy tests on a self-hosted runner with Maya installed (label: maya)"
+        type: boolean
+        default: false
+
+jobs:
+  lint-and-pure-tests:
+    name: Lint + pure tests (no Maya)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install tools
+        run: python -m pip install ruff pytest "PySide6-Essentials>=6.5,<6.9"
+      - name: Ruff
+        run: python -m ruff check blender_kontrol tests drag_drop_install.py userSetup.py tools
+      - name: Byte-compile for Python 3.7+ syntax (Maya 2022)
+        run: python -m compileall -q blender_kontrol drag_drop_install.py
+      - name: Pure tests (keys, keymap, i18n, algorithms, layering)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest tests -q
+
+  mayapy:
+    name: mayapy headless tests (self-hosted)
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.maya }}
+    runs-on: [self-hosted, maya]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Headless tests
+        shell: bash
+        run: |
+          MAYAPY="${MAYAPY:-C:/Program Files/Autodesk/Maya2027/bin/mayapy.exe}"
+          export MAYA_APP_DIR="$RUNNER_TEMP/maya_app"
+          "$MAYAPY" tests/headless_tests.py

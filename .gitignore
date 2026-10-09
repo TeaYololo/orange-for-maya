@@ -3,3 +3,6 @@ __pycache__/
 *.bak*
 .DS_Store
 Thumbs.db
+dist/
+.pytest_cache/
+.ruff_cache/

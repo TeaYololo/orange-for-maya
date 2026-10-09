@@ -1,0 +1,31 @@
+[project]
+name = "orange-for-maya"
+version = "0.9.0"
+description = "Orange: Maya, the Blender way. Blender keymap, modal tools, pie menus and 3D cursor for Autodesk Maya."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.7"
+
+# Maya eklentisidir: pip ile kurulmaz. Kurulum icin drag_drop_install.py dosyasini Maya'ya surukle.
+# Bu dosya yalnizca gelistirme araclarinin (ruff, pytest) ayarlarini tutar.
+
+[tool.ruff]
+line-length = 140
+target-version = "py37"          # Maya 2022 = Python 3.7
+extend-exclude = ["blender_kontrol/i18n_en.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B006", "B008"]
+ignore = [
+    "E731",   # lambda atamasi: kisayol tablolarinda bilincli
+    "E741",   # l / O degisken adlari (eski kod)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"blender_kontrol/__init__.py" = ["E402", "F401"]
+"tests/*" = ["E402", "E501"]
+"blender_kontrol/helptext.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
