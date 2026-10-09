@@ -293,7 +293,11 @@ def _front(viewport, timeout=15.0):
 
 
 def _close_floating():
-    """Gorunumun ustunde yuzen paneller (UV Toolkit vb.) kareye girmesin."""
+    """Gorunumun ustunde yuzen paneller (UV Toolkit vb.) kareye girmesin: Maya penceresi disindaki her gorunur
+    ust pencere gizlenir (yalniz test / demo Maya'sinda calistir)."""
+    for w in QtWidgets.QApplication.topLevelWidgets():
+        if w.isVisible() and w.objectName() != 'MayaWindow' and w.windowTitle():
+            w.hide()
     for w in cmds.lsUI(type='workspaceControl') or []:
         try:
             if cmds.workspaceControl(w, q=True, floating=True) and cmds.workspaceControl(w, q=True, visible=True):
@@ -343,6 +347,10 @@ def _run(out_dir, fps):
     _settle(5.0)     # Maya yeni sahneden sonra ertelenmis islerinde secim modunu sifirliyor
     _close_floating()
     b.set_setting('language', 'en')
+    try:
+        b.lifecycle._build_menu()             # menu etiketleri Ingilizce
+    except Exception:
+        pass
     T._standard_camera(b)
     c = T.Ctx('demo')
     if not _front(c.widget):
@@ -353,6 +361,7 @@ def _run(out_dir, fps):
     cmds.setAttr('perspShape.centerOfInterest', 19.0)
     cmds.select(cube)
     cmds.refresh(force=True)
+    _close_floating()
     rec = Recorder(c, out_dir, fps)
     center = c.gpos((0, 0, 0))
     QtGui.QCursor.setPos(center)
@@ -441,8 +450,8 @@ def _run(out_dir, fps):
                 rec.MISSED.append('pie click 2')
                 _pie().close()
 
-    # 6. F3 arama -> modifier paneli -> Subdivision + Array
-    rec.caption.set('<b>F3</b> search any command')
+    # 6. Modifier paneli iki yoldan: F3 arama (Subdivision) ve Orange menusu (Array)
+    rec.caption.set('<b>F3</b> search any command &nbsp;·&nbsp; open the <b>Modifier panel</b>')
     from blender_kontrol.search import SearchPalette
 
     def palette():
@@ -455,6 +464,18 @@ def _run(out_dir, fps):
             if w.objectName() == 'BlenderKontrolModifiers' and w.isVisible():
                 return w
 
+    def wait_panel():
+        end = time.time() + 2.0
+        while time.time() < end and panel_widget() is None:
+            rec.pump(0.1)
+        return panel_widget()
+
+    vp = c.widget
+
+    def place(panel):
+        panel.move(vp.mapToGlobal(QtCore.QPoint(24, 110)))
+        rec.pump(0.05)
+
     rec.key('f3', hold=6, expect=lambda: palette() is not None)
     dlg = palette()
     if dlg:
@@ -463,35 +484,84 @@ def _run(out_dir, fps):
             QtWidgets.QApplication.sendEvent(dlg.edit, QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, Qt.Key.Key_unknown,
                                                                        Qt.KeyboardModifier.NoModifier, ch))
             rec.shot(2)
-        rec.hold(0.6)
+        rec.hold(0.7)
         rec.keycast.push('⏎ Enter')
         QtWidgets.QApplication.sendEvent(dlg.edit, QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, Qt.Key.Key_Return,
                                                                    Qt.KeyboardModifier.NoModifier, '\r'))
-        end = time.time() + 2.0
-        while time.time() < end and panel_widget() is None:
-            rec.pump(0.1)
-        rec.hold(0.8)
-    panel = panel_widget()
+    panel = wait_panel()
     if panel is None:
         rec.MISSED.append('f3 -> modifier panel')
         panel = b.modifiers.show_panel()
-    vp = c.widget
-    panel.move(vp.mapToGlobal(QtCore.QPoint(24, 110)))
+    place(panel)
     cmds.viewFit('persp', cube, animate=False, fitFactor=0.35)
-    rec.hold(0.8)
-    rec.caption.set('Modifiers, the Blender way &nbsp;·&nbsp; <b>Subdivision Surface</b> (smooth preview) '
-                    '+ <b>Array</b> (live instances)')
+    rec.hold(0.9)
+    rec.caption.set('Add <b>Subdivision Surface</b> &nbsp;·&nbsp; smooth preview, the cage stays editable')
     panel.add_box.setCurrentIndex(panel.add_box.findData('subdiv'))
-    rec.hold(0.7)
+    rec.hold(0.8)
     panel._add()
-    rec.hold(1.3)
+    rec.hold(1.6)
+    panel.close()
+    rec.hold(0.5)
+
+    # Orange menusu -> Modifier panel...
+    rec.caption.set('...or open it from the <b>Orange</b> menu')
+    mw = [w for w in QtWidgets.QApplication.topLevelWidgets() if w.objectName() == 'MayaWindow'][0]
+    bar = mw.menuBar()
+    act = [x for x in bar.actions() if x.text().replace('&', '') == 'Orange'][0]
+    head = bar.mapToGlobal(bar.actionGeometry(act).center())
+    rec.glide(QtGui.QCursor.pos(), head, steps=14, hold_end=3)
+    rec.keycast.push('LMB')
+    rec.state = 'lmb'
+    bar.setActiveAction(act)                 # menuyu ac (tikla ayni)
+    rec.shot(1)
+    rec.state = ''
+    menu = act.menu()
+    end = time.time() + 2.0
+    while time.time() < end and not menu.isVisible():
+        rec.pump(0.05)
+    rec.hold(0.6)
+    items = [x for x in menu.actions() if x.text().replace('&', '').startswith('Modifier panel')]
+    if items and menu.isVisible():
+        item = items[0]
+        ipos = menu.mapToGlobal(menu.actionGeometry(item).center())
+        pts = [QtGui.QCursor.pos(), QtCore.QPoint(head.x(), ipos.y()), ipos]
+        for a_, b_ in zip(pts, pts[1:]):           # once asagi, sonra saga: menude dogal hareket
+            steps = 10
+            for i in range(1, steps + 1):
+                t = i / float(steps)
+                t = t * t * (3 - 2 * t)
+                q = QtCore.QPoint(int(a_.x() + (b_.x() - a_.x()) * t), int(a_.y() + (b_.y() - a_.y()) * t))
+                QtGui.QCursor.setPos(q)
+                hit = menu.actionAt(menu.mapFromGlobal(q))
+                if hit is not None:
+                    menu.setActiveAction(hit)
+                rec.shot(1)
+        menu.setActiveAction(item)
+        rec.hold(0.6)
+        rec.keycast.push('LMB')
+        rec.state = 'lmb'
+        rec.shot(1)
+        rec.state = ''
+        menu.hide()
+        bar.setActiveAction(None)
+        item.trigger()
+    else:
+        rec.MISSED.append('orange menu')
+        menu.hide()
+        b.modifiers.show_panel()
+    panel = wait_panel()
+    if panel is None:
+        panel = b.modifiers.show_panel()
+    place(panel)
+    rec.hold(0.9)
+    rec.caption.set('Add <b>Array</b> &nbsp;·&nbsp; live instances, the copies follow every edit')
     panel.add_box.setCurrentIndex(panel.add_box.findData('array'))
-    rec.hold(0.7)
+    rec.hold(0.8)
     panel._add()
     cmds.select(cube)
     cmds.viewFit('persp', animate=False, fitFactor=0.42)
     cmds.select(cube)
-    rec.hold(1.5)
+    rec.hold(1.6)
     for w in QtWidgets.QApplication.topLevelWidgets():
         if w.objectName() == 'MayaWindow':
             w.activateWindow()
