@@ -56,7 +56,11 @@ STUBBED = _install_maya_stubs()
 
 try:
     from PySide6 import QtWidgets
-except ImportError:  # pragma: no cover
-    from PySide2 import QtWidgets
+except ImportError as _pyside6_error:  # pragma: no cover
+    try:
+        from PySide2 import QtWidgets
+    except ImportError:
+        # asil sebep PySide6'nin hatasidir (Linux'ta eksik libEGL / libxkbcommon gibi); onu goster
+        raise _pyside6_error
 if QtWidgets.QApplication.instance() is None:
     _APP = QtWidgets.QApplication([])
