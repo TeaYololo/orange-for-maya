@@ -205,7 +205,7 @@ EN = {
     'Bu tuş tanınmadı, başka bir tuş dene': 'This key was not recognised, try another one',
     'Değiştir': 'Change',
     'Dil': 'Language',
-    'Dil değişikliği menüye ve bu pencereye yeniden açılınca yansır.': 'A language change applies to the menu and this window after reopening them.',
+    'Dil değişikliği Orange menüsüne hemen, bu pencereye yeniden açılınca yansır.': 'A language change applies to the Orange menu at once and to this window after reopening it.',
     'Dönüşüm oryantasyonu': 'Transform orientation',
     'Genel': 'General',
     'Hepsini varsayılana döndür': 'Reset all to default',

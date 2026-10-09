@@ -1,5 +1,10 @@
 # Değişiklikler
 
+## Yayımlanmamış
+
+- **Language / Dil** alt menüsü Orange menüsünde (Auto / English / Türkçe); seçim menüyü hemen o dilde yeniden kurar. Ayarlar penceresindeki dil satırı da iki dilde yazıyor ve menüyü anında günceller.
+- **Shift+A şekilleri Blender varsayılanlarıyla:** düzlem 1 yüz / 4 köşe, küp 2 birim, UV küre 32 × 16, silindir ve koni 32 kenar, torus 48 × 12 (küçük yarıçap 0.25). Önceden Maya'nın varsayılanları geliyordu (düzlem 10 × 10 bölme).
+
 ## 0.9.0 — 2026-10-09 (modifier'lar, UV, Blender ile FBX)
 
 ### Modifier'lar (Orange menüsü → Modifier paneli, F3)

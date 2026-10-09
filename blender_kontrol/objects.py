@@ -185,8 +185,28 @@ def unhide_all():
     _msg(_t('%d obje gösterildi') % shown)
 
 
+# Shift+A primitifleri Blender'in varsayilanlariyla (Maya'nin varsayilanlari farkli: duzlem 10x10, kure 20x20,
+# silindir / koni 20 kenar, torus 20x20 ve kalin). Olculer sahne biriminde Blender ile ayni sayilar.
+BLENDER_PRIMITIVES = {
+    'cube': (cmds.polyCube, dict(width=2, height=2, depth=2, subdivisionsX=1, subdivisionsY=1, subdivisionsZ=1)),
+    'plane': (cmds.polyPlane, dict(width=2, height=2, subdivisionsX=1, subdivisionsY=1)),
+    'sphere': (cmds.polySphere, dict(radius=1, subdivisionsAxis=32, subdivisionsHeight=16)),
+    'cylinder': (cmds.polyCylinder, dict(radius=1, height=2, subdivisionsAxis=32, subdivisionsHeight=1,
+                                         subdivisionsCaps=0)),
+    'cone': (cmds.polyCone, dict(radius=1, height=2, subdivisionsAxis=32, subdivisionsHeight=1, subdivisionsCap=0)),
+    'torus': (cmds.polyTorus, dict(radius=1, sectionRadius=0.25, subdivisionsAxis=48, subdivisionsHeight=12)),
+}
+
+
+def primitive_fn(kind):
+    """Blender varsayilanlariyla primitif olusturan fonksiyon (Shift+A, edit modunda ekleme)."""
+    fn, kwargs = BLENDER_PRIMITIVES[kind]
+    return functools.partial(fn, **kwargs)
+
+
 def add_menu():
-    mesh_fns = (cmds.polyCube, cmds.polyPlane, cmds.polySphere, cmds.polyCylinder, cmds.polyCone, cmds.polyTorus)
+    prims = dict((k, primitive_fn(k)) for k in BLENDER_PRIMITIVES)
+    mesh_fns = tuple(prims.values())
 
     def add(fn):
         def run():
@@ -204,12 +224,12 @@ def add_menu():
                 cmds.select(node, replace=True)
         return run
     popup(_t('Ekle'), [
-        (_t('&Küp'), add(cmds.polyCube)),
-        (_t('&Düzlem (Plane)'), add(cmds.polyPlane)),
-        (_t('&Küre (UV Sphere)'), add(cmds.polySphere)),
-        (_t('&Silindir'), add(cmds.polyCylinder)),
-        (_t('K&oni'), add(cmds.polyCone)),
-        (_t('&Torus'), add(cmds.polyTorus)),
+        (_t('&Küp'), add(prims['cube'])),
+        (_t('&Düzlem (Plane)'), add(prims['plane'])),
+        (_t('&Küre (UV Sphere)'), add(prims['sphere'])),
+        (_t('&Silindir'), add(prims['cylinder'])),
+        (_t('K&oni'), add(prims['cone'])),
+        (_t('&Torus'), add(prims['torus'])),
         None,
         (_t('Çember (eğri)'), add(cmds.circle)),
         (_t('Eğri çiz (CV Curve)'), lambda: mel.eval('CVCurveTool')),

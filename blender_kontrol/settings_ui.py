@@ -18,7 +18,7 @@ class SettingsDialog(QtWidgets.QDialog):
     """Genel ayarlar + kisayol duzenleyici. Degisiklikler aninda uygulanir ve kaydedilir."""
 
     CHOICES = {
-        'language': [('auto', 'Otomatik (sistem dili)'), ('tr', 'Türkçe'), ('en', 'English')],
+        'language': [('auto', 'Auto (system language) / Otomatik'), ('en', 'English'), ('tr', 'Türkçe')],
         'space_action': [('play', 'Oynat / durdur (Blender)'), ('search', 'Arama (F3 gibi)'), ('hotbox', 'Maya hotbox')],
         'pivot': [(k, PIVOT_NAMES[k]) for k in ('median', 'bbox', 'cursor', 'active', 'individual')],
         'orientation': [(k, FRAME_NAMES[k]) for k in ('global', 'local', 'normal', 'view', 'cursor', 'parent')],
@@ -34,7 +34,7 @@ class SettingsDialog(QtWidgets.QDialog):
               ('snap_on', 'Snap açık (Shift+Tab)'),
               ('destructive_edit', "Edit modunda geçmiş bırakma (Blender gibi; F9 bu modda çalışmaz, "
                                    "Orange modifier'lı mesh'lere dokunulmaz)")]
-    LABELS = {'language': 'Dil', 'space_action': 'Space tuşu', 'pivot': 'Pivot noktası',
+    LABELS = {'language': 'Language / Dil', 'space_action': 'Space tuşu', 'pivot': 'Pivot noktası',
               'orientation': 'Dönüşüm oryantasyonu', 'snap_target': 'Snap hedefi',
               'cursor_orient': '3D imleç yönü (Shift+sağ tık)', 'overlay': 'Önizleme çizimi (eksen, loop cut)'}
 
@@ -63,7 +63,7 @@ class SettingsDialog(QtWidgets.QDialog):
                 box.addItem(_t(label) if key != 'language' else label, value)
             box.setCurrentIndex(max(0, box.findData(setting(key))))
             box.currentIndexChanged.connect(functools.partial(self._combo_changed, key, box))
-            form.addRow(_t(self.LABELS[key]), box)
+            form.addRow(_t(self.LABELS[key]) if key != 'language' else self.LABELS[key], box)
         for key, label in self.CHECKS:
             check = QtWidgets.QCheckBox(_t(label))
             check.setChecked(bool(setting(key)))
@@ -76,12 +76,16 @@ class SettingsDialog(QtWidgets.QDialog):
         vp2.setWordWrap(True)
         vp2.setStyleSheet('color: gray')
         form.addRow('', vp2)
-        note = QtWidgets.QLabel(_t('Dil değişikliği menüye ve bu pencereye yeniden açılınca yansır.'))
+        note = QtWidgets.QLabel(_t('Dil değişikliği Orange menüsüne hemen, bu pencereye yeniden açılınca yansır.'))
         note.setStyleSheet('color: gray')
         form.addRow('', note)
         return page
 
     def _combo_changed(self, key, box, *_):
+        if key == 'language':
+            from .lifecycle import set_language  # dongusel import: cagri aninda
+            set_language(box.currentData())        # Orange menusu hemen yeni dilde
+            return
         set_setting(key, box.currentData())
 
     # -- kisayollar

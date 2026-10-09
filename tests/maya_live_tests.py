@@ -498,6 +498,22 @@ def t_install(c):
              else 'Maya, the Blender way' in text, text[:60])
         for w in help_w:
             w.close()
+    # Orange menusunde iki dilli dil alt menusu; secim ayari degistirir ve menuyu yeni dilde kurar
+    items = cmds.menu('BlenderKontrolMenu', q=True, itemArray=True) or []
+    lang_menu = [i for i in items if cmds.menuItem(i, q=True, label=True) == 'Language / Dil']
+    c.ok('menude Language / Dil', len(lang_menu) == 1 and cmds.menuItem(lang_menu[0], q=True, subMenu=True),
+         [cmds.menuItem(i, q=True, label=True) for i in items][:12])
+    b.lifecycle.set_language('en')
+    c.flush()
+    try:
+        import maya.utils
+        maya.utils.processIdleEvents()
+    except Exception:
+        pass
+    labels = [cmds.menuItem(i, q=True, label=True) for i in cmds.menu('BlenderKontrolMenu', q=True, itemArray=True)
+              if not cmds.menuItem(i, q=True, divider=True)]
+    c.ok('dil menusu: English secince menu Ingilizce', b.setting('language') == 'en'
+         and any('Shortcut' in l for l in labels), labels[:3])
     b.set_setting('language', 'tr')
     b._build_menu()
     missing = []
@@ -1418,6 +1434,13 @@ def t_object(c):
     new = cmds.ls(sl=True)[0]
     c.ok('Shift+A imlece eklendi', _round(cmds.xform(new, q=True, ws=True, t=True)) == [2, 3, 4], new)
     cmds.rename(new, PREFIX + 'added')
+    with c.popups() as calls:
+        c.press('shift+a')
+        c.run_item(calls, 'düzlem')
+    plane = cmds.ls(sl=True)[0]
+    c.ok('Shift+A duzlem Blender gibi 4 kose', cmds.polyEvaluate(plane, vertex=True) == 4
+         and cmds.polyEvaluate(plane, face=True) == 1, cmds.polyEvaluate(plane, vertex=True))
+    cmds.delete(plane)
     b.set_cursor(om.MPoint(0, 0, 0), (0, 0, 0))
     # M layer, Ctrl+G
     cmds.select(a)

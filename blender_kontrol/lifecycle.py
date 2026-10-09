@@ -167,6 +167,17 @@ def _toggle(*_):
     cmds.evalDeferred(uninstall if is_installed() else install)
 
 
+LANGUAGES = (('auto', 'Auto (system language) / Otomatik'), ('en', 'English'), ('tr', 'Türkçe'))
+
+
+def set_language(code):
+    """Dili degistir ve Orange menusunu yeni dilde yeniden kur (menu kendi callback'i icinde silinemez:
+    evalDeferred)."""
+    set_setting('language', code)
+    if not cmds.about(batch=True):
+        cmds.evalDeferred(_build_menu)
+
+
 def _build_menu():
     from . import __version__  # dongusel import: cagri aninda
     name = 'BlenderKontrolMenu'
@@ -183,6 +194,11 @@ def _build_menu():
     cmds.menuItem(label=_t('Blender için FBX dışa aktar...'), command=lambda *_: interop.export_for_blender(), parent=menu)
     cmds.menuItem(label=_t('Blender FBX içe aktar...'), command=lambda *_: interop.import_from_blender(), parent=menu)
     cmds.menuItem(divider=True, dividerLabel=_t('Ayarlar'), parent=menu)
+    lang = cmds.menuItem(label='Language / Dil', subMenu=True, parent=menu)     # iki dilde: her kullanici bulsun
+    cmds.radioMenuItemCollection(parent=lang)
+    for value, label in LANGUAGES:
+        cmds.menuItem(label=label, radioButton=setting('language') == value, parent=lang,
+                      command=functools.partial(lambda v, *_: set_language(v), value))
     cmds.menuItem(label=_t('Emulate Numpad (üst sıradaki rakamlar = numpad)'), parent=menu,
                   checkBox=bool(setting('emulate_numpad')),
                   command=lambda on: set_setting('emulate_numpad', on))

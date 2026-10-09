@@ -360,6 +360,20 @@ def _bevel_shape_problems(obj, flat=True):
     return bad
 
 
+def test_blender_primitives():
+    """Shift+A primitifleri Blender varsayilanlariyla: duzlem 4 kose, kure 32x16, silindir / koni 32, torus 48x12."""
+    cmds.file(new=True, force=True)
+    want = {'plane': (4, 1), 'cube': (8, 6), 'sphere': (32 * 15 + 2, 32 * 16), 'cylinder': (64, 34),
+            'cone': (33, 33), 'torus': (48 * 12, 48 * 12)}
+    for kind, (verts, faces) in sorted(want.items()):
+        node = bk.objects.primitive_fn(kind)()[0]
+        got = (cmds.polyEvaluate(node, vertex=True), cmds.polyEvaluate(node, face=True))
+        ok('Shift+A %s Blender varsayilani' % kind, got == (verts, faces), got)
+    box = cmds.exactWorldBoundingBox(bk.objects.primitive_fn('cube')()[0])
+    ok('Shift+A kup 2 birim', [round(v, 4) for v in box] == [-1, -1, -1, 1, 1, 1], box)
+    cmds.file(new=True, force=True)
+
+
 def test_destructive_edit():
     cmds.file(new=True, force=True)
     old = bk.setting('destructive_edit')
@@ -436,7 +450,8 @@ def test_vp2_overlay():
 
 def main():
     for fn in (test_i18n, test_keys, test_parse, test_mesh_helpers, test_selection_ops, test_mesh_ops,
-               test_keymap_and_settings, test_grid_fill, test_modifiers, test_destructive_edit, test_fbx_roundtrip,
+               test_keymap_and_settings, test_grid_fill, test_modifiers, test_blender_primitives, test_destructive_edit,
+               test_fbx_roundtrip,
                test_vp2_overlay,
                test_installer):
         try:
