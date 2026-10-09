@@ -4,7 +4,8 @@
 
 Orange lets Blender users work in Autodesk Maya with the muscle memory they already have: the Blender keymap and mouse navigation, modal G / R / S with axis locking and typed values, Tab edit mode, extrude / inset / bevel / loop cut with live preview, pie menus, a 3D cursor, pivot and orientation pies, snapping, F2 / F3 / F9 and Blender-style preferences.
 
-<p align="center"><img src="docs/media/demo.gif" width="760" alt="Tab into edit mode, E extrude with a typed value, Ctrl+R loop cut with preview, G X 2, Z shading pie"></p>
+<p align="center"><img src="docs/media/demo.gif" width="760" alt="Tab edit mode, E extrude with a typed value, Ctrl+R loop cut with preview, Ctrl+B bevel, G X 2 and R Z 45, Z shading pie, F3 search, Subdivision and Array modifiers updating live"></p>
+<p align="center"><sub>Keys shown on screen as they are pressed. <a href="docs/media/demo.mp4">MP4 version</a> (1080p).</sub></p>
 
 It never edits Maya's own hotkeys. Turn it off from the **Orange** menu and Maya is back to its defaults. Keys are read by physical position, so it works on any keyboard layout. The interface is in English and Turkish.
 
