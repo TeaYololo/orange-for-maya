@@ -33,7 +33,7 @@ The installer:
 **Without drag and drop** (Script Editor, Python tab):
 
 ```python
-import sys; sys.path.insert(0, r"C:/path/to/unzipped/Orange-0.7.0")
+import sys; sys.path.insert(0, r"C:/path/to/unzipped/Orange-1.0.0")
 import drag_drop_install; drag_drop_install.install()
 ```
 
@@ -45,7 +45,7 @@ import drag_drop_install; drag_drop_install.install()
 
 - Shortcuts work while the mouse is **over a 3D viewport**; the Outliner, UV Editor and Graph Editor get their own Blender keys, every other editor keeps Maya's behaviour.
 - **F1** shows the full shortcut list, **F3** searches every command, **Ctrl+,** opens the settings and the shortcut editor.
-- **Orange** menu: on / off, shortcut list, settings, printable shortcut card, quick preferences, key test, report an issue, reload, remove.
+- **Orange** menu: on / off, shortcut list, settings, printable shortcut card, quick preferences, update checks, key test, report an issue, reload, remove. Orange can check GitHub Releases at startup; a new version only shows a short notice and an **Update to ...** item at the top of the menu (no dialog interrupts you). You approve the download (with progress and cancel), and Maya installs the staged update the next time it opens. Turn this off with **Automatically check for updates**.
 
 ### Highlights
 
@@ -59,14 +59,14 @@ import drag_drop_install; drag_drop_install.install()
 | Object | Ctrl+P / Alt+P parent menus, Ctrl+L link materials / UVs / layer, Ctrl+G new layer, M move to layer, Ctrl+Alt+Shift+C set origin, Alt+Q transfer mode, Shift+O / Alt+O proportional falloff, Boolean from F3 |
 | Animation | I / Alt+I keys, Space play, Shift+Ctrl+Space reverse, arrows and Alt+wheel for frames and keys |
 | Modes and editors | Ctrl+Tab mode pie with Sculpt (F / Shift+F radius and strength, Blender brush keys) and Vertex / Weight / Texture Paint; UV editor keys (G / R / S with the mouse, 1-4, L, U, P, V, Alt+V, Shift+S); Graph Editor / Dope Sheet keys (G with the mouse, S, T, V, Shift+E, X, P); F9 adjust-last panel; red-white 3D cursor with rotation; Q favorites; Ctrl+F2 batch rename; Ctrl+PageUp/Down workspaces; Shift+` walk |
-| Modifiers | Modifier panel (Orange menu): Subdivision Surface as smooth mesh preview, Mirror and Array as live instances, Bevel / Solidify / Triangulate / Weld as history nodes; toggle, adjust, apply; Ctrl+A applies them all |
+| Modifiers | A modifier panel docked on the right, laid out like Blender's Properties editor. Add Modifier gives you Subdivision, Mirror, Array, Bevel, Solidify, Triangulate and Weld as live, ordered Maya history nodes. Drag a card's handle to reorder (a blue line shows where it lands), switch any card off, remove it, or apply it together with everything above it. Tab edits the mesh underneath while the stack stays live. Array has Relative and Constant spacing, an Object Offset driven by any transform (animatable) and Merge for the seams. |
 | Working with Blender | Export FBX for Blender (meters, smoothing groups) and import FBX from Blender (Orange menu or F3); every Orange command is also in Maya's Hotkey Editor under "Orange" |
-| Settings | Language, Emulate Numpad, Emulate 3 Button Mouse, spacebar action, Zoom to Mouse Position, Orbit Around Selection, defaults for pivot / orientation / snap, "no construction history in edit mode" (like Blender), preview drawing (Qt layer or Viewport 2.0), and a **shortcut editor** (press the new key, conflicts are resolved, saved to `prefs/blender_kontrol_keymap.json`) |
+| Settings | Language, Emulate Numpad, Emulate 3 Button Mouse, spacebar action, Zoom to Mouse Position, Orbit Around Selection, defaults for pivot / orientation / snap, "no construction history in edit mode" (like Blender), preview drawing (Qt layer or Viewport 2.0), and a **shortcut editor** (click the Shortcut field of a row, press the new key, conflicts are resolved, saved to `prefs/blender_kontrol_keymap.json`) |
 
 ## Differences from Blender
 
 - Every Maya operation leaves **construction history**. When you are done: **Ctrl+A → Delete History**, or turn on **"no construction history in edit mode"** in the settings (then F9 has nothing to adjust).
-- **Modifiers** follow Maya's own model: in Maya every edit is appended after existing history, so a mirror or subdivision node would be edited "after" itself. Orange therefore uses smooth mesh preview for Subdivision and live instances for Mirror and Array (you keep editing the base mesh, like Blender's cage), and history nodes for Bevel, Solidify, Triangulate and Weld. Reordering the stack is not supported.
+- **Modifiers** are ordinary Maya construction history, kept in order, with an editable source mesh underneath. Mirror is a small group of native polyMirror nodes (with a movable mirror plane, merge and cut options); Array is Orange's own mesh node (C++ on Maya 2027 / Windows, Python elsewhere) with Relative / Constant spacing, Object Offset and Merge. Cards can only be reordered past other Orange cards, not past unrelated Maya nodes. Crease weights do not pass through the Array node yet. Apply All removes the rest of the history too, and warns first if unrelated nodes would go with it.
 - Maya meshes cannot contain edges without faces, so there is **no vertex extrude**, and **F** on two vertices only adds an edge when they share a face.
 - Maya is **Y-up** and uses centimeters by default; the numpad top view is Maya's top.
 - The 3D cursor is a locator named `blenderCursor`, hidden in the Outliner and not selectable.
@@ -90,7 +90,8 @@ icons/             shelf icon
 tests/             test_pure.py (pytest, no Maya), headless_tests.py (mayapy), maya_live_tests.py (inside Maya)
 tools/             build_release.py (zip + App Store bundle), build_cheatsheet.py, make_icons.py,
                    demo_capture.py + make_gif.py (README GIF, recorded inside Maya with real events)
-docs/              cheat sheets, research notes, marketplace.md (App Store checklist), duyuru.md (announcement drafts)
+docs/              cheat sheets, demo media, marketplace.md (App Store checklist), duyuru.md (announcement drafts)
+native/            orangeArray C++ source and build notes (the compiled .mll ships in blender_kontrol/)
 ```
 
 - **Pure tests** (no Maya, CI): `python -m pytest tests` (needs `PySide6-Essentials`). They cover key tables, the keymap, translations, algorithms and the module layering rule.
@@ -124,11 +125,13 @@ Orange bağımsız bir projedir; Blender Foundation ya da Autodesk ile ilişkili
 
 **Kaldırma:** Orange menüsü → **Orange'ı kaldır...** Modül klasörü, `.mod` dosyası ve raf düğmesi silinir; ayarların ve kısayolların kalır.
 
-**Kullanım:** kısayollar fare 3D görünümün üzerindeyken çalışır. **F1** kısayol listesi, **F3** komut arama, **Ctrl+,** ayarlar ve kısayol düzenleyici. Kısayol düzenleyicide satıra çift tıklayıp yeni tuşa basman yeterli; çakışan komutun kısayolu kaldırılır. Orange menüsü → **Kısayol kartı** kendi kısayollarınla yazdırılabilir bir kart açar.
+**Kullanım:** kısayollar fare 3D görünümün üzerindeyken çalışır. **F1** kısayol listesi, **F3** komut arama, **Ctrl+,** ayarlar ve kısayol düzenleyici. Kısayol düzenleyicide satırın **Kısayol** alanına tıklayıp yeni tuşa basman yeterli; çakışan komutun kısayolu kaldırılır. Orange menüsü → **Kısayol kartı** kendi kısayollarınla yazdırılabilir bir kart açar.
+
+**Güncellemeler:** Orange her Maya açılışında GitHub Releases'ı denetler; yeni sürüm varsa kısa bir bildirim gösterir ve Orange menüsünün başına **... sürümüne güncelle** öğesini ekler (pencere açılmaz, çalışmanı bölmez). İndirmeyi onayladığında güncelleme ilerleme penceresiyle indirilir (iptal edilebilir) ve Maya'nın sonraki açılışında kurulur. **Bu sürümü atla** yalnızca o sürümü gizler; **Bir daha sorma** otomatik denetimi kapatır. Otomatik denetimi Orange menüsünden tekrar açabilir veya **Güncellemeleri denetle...** ile elle kontrol edebilirsin.
 
 **Sorun bildirme:** Orange menüsü → **Sorun bildir...** Maya, Python, Qt, platform ve ayar bilgilerini panoya kopyalar (kişisel veri yok, hiçbir yere gönderilmez) ve GitHub sorun formunu açar. Bir tuş çalışmıyorsa Orange menüsü → **Tuş testi...** o tuşun nasıl okunduğunu gösterir; satırı rapora ekle.
 
-**Modifier'lar ve Blender ile çalışma:** Orange menüsü → Modifier paneli: Subdivision (smooth preview), Mirror ve Array (canlı instance; taban mesh'i düzenlemeye devam edersin), Bevel / Solidify / Triangulate / Weld (geçmiş düğümü); Ctrl+A hepsini uygular. Orange menüsü ya da F3: Blender için FBX dışa aktar / Blender FBX içe aktar. Her Orange komutu Maya Hotkey Editor'da "Orange" kategorisinde.
+**Modifier'lar ve Blender ile çalışma:** Orange menüsü → Modifier paneli: Subdivision, Mirror, Array, Bevel, Solidify, Triangulate ve Weld tek sıralı yığında çalışır. Kart tutamağını sürükleyerek sırala (mavi çizgi nereye gideceğini gösterir), kartı kapat, kaldır ya da seçili karta kadar uygula. Tab ile alttaki mesh'i düzenlerken yığın canlı kalır. Array'de Relative / Constant, Object Offset ("Seçiliyi kullan" ile herhangi bir transform) ve Merge var. Ctrl+A tüm history'yi uygular. Orange menüsü ya da F3: Blender için FBX dışa aktar / Blender FBX içe aktar.
 
 **Blender'dan farklar:** Maya her işlemde geçmiş (history) bırakır, işin bitince Ctrl+A → Geçmişi temizle (ya da ayarlardan "edit modunda geçmiş bırakma"yı aç). Maya mesh'inde yüzü olmayan kenar olamadığı için köşe extrude yoktur ve F iki köşede yalnızca ortak yüzleri varsa kenar açar. Maya Y-yukarı ve santimetre kullanır. Sağ tık Maya'nın marking menu'sü olarak kalır.
 

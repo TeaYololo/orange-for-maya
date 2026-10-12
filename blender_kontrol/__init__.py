@@ -31,18 +31,18 @@ fonksiyon icinde import edilir):
 """
 from __future__ import absolute_import, division, print_function
 
-__version__ = '0.9.0'
+__version__ = '1.0.0'
 PRODUCT = 'Orange'
 TAGLINE = 'Maya, the Blender way'
 
 from . import compat, core, settings, i18n, keys, util, ui, picking, mayaprefs  # noqa: E402
 from . import editmode, cursor, pivot, anim, view, modal, valuemodal, loopcut, slide  # noqa: E402
 from . import selection, mesh, objects, modifiers, interop, modes, uv, graph, adjust, helptext, settings_ui  # noqa: E402
-from . import diagnostics, search, keymap, cheatsheet, hotkeys, events, lifecycle  # noqa: E402
+from . import diagnostics, search, keymap, cheatsheet, hotkeys, events, update, lifecycle  # noqa: E402
 
 MODULES = (compat, core, settings, i18n, keys, util, ui, picking, mayaprefs, editmode, cursor, pivot, anim,
            view, modal, valuemodal, loopcut, slide, selection, mesh, objects, modifiers, interop, modes, uv, graph, adjust,
-           helptext, settings_ui, diagnostics, search, keymap, cheatsheet, hotkeys, events, lifecycle)
+           helptext, settings_ui, diagnostics, search, keymap, cheatsheet, hotkeys, events, update, lifecycle)
 
 # Geriye uyumluluk: tek dosyali surumdeki adlar paket uzerinden de erisilebilir
 # (blender_kontrol.install(), blender_kontrol.Modal ...). Yeni kodda alt modulu kullan.

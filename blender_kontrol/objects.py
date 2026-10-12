@@ -34,6 +34,14 @@ def duplicate():
     if not objs:
         return
     new = cmds.duplicate(objs, returnRootsOnly=True)
+    # duplicate, modifier kafesini (intermediate shape) kopyalar ama history'yi kopyalamaz; kopyada
+    # o kafes hicbir seyi beslemez ve Tab'da duzenlenirse gorunen mesh degismezdi.
+    from . import modifiers
+    for obj in cmds.ls(new, long=True) or []:
+        try:
+            modifiers._discard_stale_cages(obj)
+        except Exception:
+            pass
     cmds.select(new, replace=True)
     start_modal('move')
 
@@ -131,7 +139,7 @@ def collection_menu():
 
     def new_layer():
         box = _PopupLine('layer1', lambda name: cmds.createDisplayLayer(objs, name=name, noRecurse=True))
-        box.move(QtGui.QCursor.pos() - QtCore.QPoint(130, 15))
+        move_near_cursor(box, QtCore.QPoint(-130, -15))
         box.show()
         box.setFocus()
 
@@ -245,6 +253,23 @@ def add_menu():
     ])
 
 
+def clamp_to_screen(pos, size, margin=8):
+    """Pencere sol ustu pos'ta olunca ekrandan tasmasin: imlecin bulundugu ekranin kullanilabilir alanina cek."""
+    screen = QtGui.QGuiApplication.screenAt(pos) or QtGui.QGuiApplication.primaryScreen()
+    if screen is None:
+        return pos
+    area = screen.availableGeometry()
+    x = min(max(pos.x(), area.left() + margin), max(area.left() + margin, area.right() - size.width() - margin))
+    y = min(max(pos.y(), area.top() + margin), max(area.top() + margin, area.bottom() - size.height() - margin))
+    return QtCore.QPoint(x, y)
+
+
+def move_near_cursor(widget, offset):
+    """widget'i imlec + offset konumuna, ekran sinirlari icinde kalacak sekilde tasi."""
+    size = widget.size() if widget.isVisible() else widget.sizeHint()
+    widget.move(clamp_to_screen(QtGui.QCursor.pos() + offset, size))
+
+
 def rename_active():
     objs = _objs() or cmds.ls(sl=True, long=True)
     if not objs:
@@ -252,7 +277,7 @@ def rename_active():
         return
     obj = objs[-1]
     box = _PopupLine(obj.split('|')[-1], lambda name: cmds.rename(obj, name))
-    box.move(QtGui.QCursor.pos() - QtCore.QPoint(130, 15))
+    move_near_cursor(box, QtCore.QPoint(-130, -15))
     box.show()
     box.setFocus()
 
@@ -276,7 +301,7 @@ def new_layer_from_selection():
         _msg(_t('Ctrl+G obje modunda çalışır'))
         return
     box = _PopupLine('layer1', lambda name: cmds.createDisplayLayer(objs, name=name, noRecurse=True))
-    box.move(QtGui.QCursor.pos() - QtCore.QPoint(130, 15))
+    move_near_cursor(box, QtCore.QPoint(-130, -15))
     box.show()
     box.setFocus()
 
@@ -484,6 +509,6 @@ def batch_rename():
         _msg(_t('Önce obje seç'))
         return
     dlg = BatchRenameDialog()
-    dlg.move(QtGui.QCursor.pos() - QtCore.QPoint(150, 60))
+    move_near_cursor(dlg, QtCore.QPoint(-150, -60))
     dlg.show()
     return dlg

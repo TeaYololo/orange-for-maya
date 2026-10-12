@@ -6,3 +6,4 @@ Thumbs.db
 dist/
 .pytest_cache/
 .ruff_cache/
+.test-tmp/

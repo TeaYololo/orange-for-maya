@@ -13,7 +13,7 @@ from .compat import (CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, 
 from .core import _current_filter_set_modal, _msg, _tip, _warn, run_after_op
 from .i18n import _t
 from .keys import _phys
-from .util import _comps, _last_view_panel, _sel
+from .util import _comps, _last_view_panel, _sel, _set_world_points
 from .ui import hint_bar
 from .editmode import current_comp, in_edit
 from .modal import Modal
@@ -68,7 +68,10 @@ class EdgeSlide(object):
         except Exception:
             pass
         fn = om.MFnMesh(dag)
+        self.fn = fn
         self.pts = fn.getPoints(om.MSpace.kWorld)
+        self.cur = om.MPointArray(self.pts)     # surukleme sirasinda yazilan noktalar (tek setPoints / kare)
+        self.proj = {}                           # kose -> ekran noktasi (sabit noktalar; gezinme yok)
         sel = set(int(v.split('[')[-1].rstrip(']')) for v in verts)
         it = om.MItMeshVertex(dag)
         self.rails = {}
@@ -87,6 +90,7 @@ class EdgeSlide(object):
         self.start_pos = QtCore.QPointF(self.eff)
         if self.mode == 'edge':
             self._assign_sides(edges)
+        self.keys_html = self._keys_html()
         cmds.undoInfo(openChunk=True, chunkName='blender_slide')
         self.chunk_open = True
         # surukleme kayitsiz (her karede kose basina bir xform kaydi birikiyordu); sonuc bitiste tek adim
@@ -116,7 +120,7 @@ class EdgeSlide(object):
         mx, my = self._port(self.start_pos)
 
         def dist2(v):
-            sx, sy = self._screen(self.pts[v])
+            sx, sy = self._screen_v(v)
             return (sx - mx) ** 2 + (sy - my) ** 2
 
         ref = min(self.verts, key=dist2)   # referans: fareye ekranda en yakin kose
@@ -166,6 +170,14 @@ class EdgeSlide(object):
         res = self.view.worldToView(om.MPoint(point))
         return float(res[0]), float(res[1])
 
+    def _screen_v(self, v):
+        """Baslangic noktasinin ekran izdusumu (kose basina bir kez; kamera surukleme boyunca sabit)."""
+        try:
+            return self.proj[v]
+        except KeyError:
+            s = self.proj[v] = self._screen(self.pts[v])
+            return s
+
     def _update_eff(self):
         raw = QtGui.QCursor.pos()
         d = raw - self.raw_last
@@ -177,7 +189,7 @@ class EdgeSlide(object):
     # -- hesap
     def _targets(self):
         """{kose: yeni_dunya_noktasi}"""
-        num = Modal._parse(self.numeric) if self.numeric else None
+        num = Modal._parse_memo(self, self.numeric)
         sx, sy = self._port(self.start_pos)
         mx, my = self._port(self.eff)
         dx, dy = mx - sx, my - sy
@@ -187,8 +199,8 @@ class EdgeSlide(object):
             if num is not None:
                 t = num
             else:
-                a = self._screen(self.pts[self.ref])
-                b = self._screen(self.pts[self.side_a[self.ref]])
+                a = self._screen_v(self.ref)
+                b = self._screen_v(self.side_a[self.ref])
                 ax, ay = b[0] - a[0], b[1] - a[1]
                 t = (dx * ax + dy * ay) / max(1e-6, ax * ax + ay * ay)
             t = max(-1.0, min(1.0, t))
@@ -219,10 +231,10 @@ class EdgeSlide(object):
         for v in self.verts:
             p = om.MPoint(self.pts[v])
             if length > 2 or num is not None:
-                a = self._screen(self.pts[v])
+                a = self._screen_v(v)
                 best, best_cos, best_edge = None, -2.0, None
                 for n in self.rails[v]:
-                    b = self._screen(self.pts[n])
+                    b = self._screen_v(n)
                     ex, ey = b[0] - a[0], b[1] - a[1]
                     el = math.hypot(ex, ey)
                     if el < 1e-6:
@@ -242,22 +254,37 @@ class EdgeSlide(object):
         self.value = shown
         return out
 
+    def _write_points(self, targets):
+        """Surukleme (undo kapali): degisen koseleri API ile toplu yaz (kose basina xform yerine)."""
+        changes = []
+        for v, p in targets.items():
+            old = self.applied.get(v)
+            if old is not None and (old - p).length() < 1e-9:
+                continue
+            self.applied[v] = p
+            changes.append((v, p))
+        if changes:
+            _set_world_points(self.fn, self.cur, changes)
+            self.dirty = True
+        return bool(changes)
+
     def update(self, force=False):
         moved = self._update_eff()
         if not force and not moved:
             return
         try:
-            for v, p in self._targets().items():
-                old = self.applied.get(v)
-                if old is not None and (old - p).length() < 1e-9:
-                    continue
-                cmds.xform('%s.vtx[%d]' % (self.obj, v), worldSpace=True, translation=(p.x, p.y, p.z))
-                self.applied[v] = p
-                self.dirty = True
+            self._write_points(self._targets())
             self._show()
         except Exception as exc:
             _warn(_t('kaydırma: %s') % exc)
             self.finish(False)
+
+    def _keys_html(self):
+        keys = [_t('<b>Fare</b> kaydır'), _t('<b>Shift</b> hassas'), _t('<b>Ctrl</b> adımlı'), _t('<b>Sayı</b> yaz')]
+        if self.mode == 'edge':
+            keys += [_t('<b>E</b> eşit mesafe'), _t('<b>F</b> çevir (eşit modda)')]
+        keys += [_t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
+        return '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)
 
     def _show(self):
         title = _t('KENAR KAYDIR' if self.mode == 'edge' else 'KÖŞE KAYDIR') + '  ·  %.2f' % self.value
@@ -265,12 +292,7 @@ class EdgeSlide(object):
             title += '  ·  ' + (_t('eşit, çevrik') if self.flip else _t('eşit'))
         if self.numeric:
             title += '   [ %s ]' % self.numeric
-        keys = [_t('<b>Fare</b> kaydır'), _t('<b>Shift</b> hassas'), _t('<b>Ctrl</b> adımlı'), _t('<b>Sayı</b> yaz')]
-        if self.mode == 'edge':
-            keys += [_t('<b>E</b> eşit mesafe'), _t('<b>F</b> çevir (eşit modda)')]
-        keys += [_t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
-        html = ('<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s'
-                % (title, '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)))
+        html = '<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s' % (title, self.keys_html)
         try:
             hint_bar().show(self.widget, html)
         except Exception:
@@ -335,12 +357,12 @@ class EdgeSlide(object):
         prev = getattr(self, 'undo_prev', None)
         if prev is not None:
             final = dict(self.applied) if ok else {}
-            for v in list(self.applied):               # baslangica don (kayitsiz)
-                p = self.pts[v]
-                cmds.xform('%s.vtx[%d]' % (self.obj, v), worldSpace=True, translation=(p.x, p.y, p.z))
+            if self.applied:                           # baslangica don (kayitsiz, tek yazim)
+                self.fn.setPoints(self.pts, om.MSpace.kWorld)
+                self.fn.updateSurface()
             cmds.undoInfo(stateWithoutFlush=prev)
             self.undo_prev = None
-            for v, p in final.items():                 # sonuc: tek undo adimi
+            for v, p in final.items():                 # sonuc: kayitli komutlarla, tek undo adimi (chunk)
                 cmds.xform('%s.vtx[%d]' % (self.obj, v), worldSpace=True, translation=(p.x, p.y, p.z))
         if ok and self.chunk_open:
             run_after_op()

@@ -10,8 +10,8 @@ import maya.api.OpenMaya as om
 
 from .core import _filter, _msg, _warn
 from .i18n import _t
-from .util import (COMP_SUFFIX, _comps, _deferred, _face_normal, _mesh_fn, _objs, _ranges, _sel, _shape_type,
-    popup, undoable)
+from .util import (COMP_SUFFIX, _comps, _deferred, _face_normal, _mesh_fn, _objs, _ranges, _sel, _set_world_points,
+    _shape_type, popup, undoable)
 from .ui import pie
 from .editmode import current_comp, enter_edit, exit_edit, in_edit, select_mode
 from .cursor import cursor_pos
@@ -668,9 +668,18 @@ def mesh_mirror_menu():
     ])
 
 
+class _VertexData(list):
+    """_selected_vertex_data sonucu: [(obje, kose_id, dunya_noktasi, dunya_normali)] + surukleme icin obje
+    basina (MFnMesh, nokta dizisi) onbellegi (bkz. _set_points)."""
+
+    def __init__(self, items=()):
+        list.__init__(self, items)
+        self.meshes = None
+
+
 def _selected_vertex_data():
     """[(obje, kose_id, dunya_noktasi, dunya_normali)] secimden (tur ne olursa olsun)."""
-    out = []
+    out = _VertexData()
     verts = cmds.ls(cmds.polyListComponentConversion(_sel(), toVertex=True) or [], flatten=True, long=True)
     fns = {}
     for v in verts:
@@ -684,8 +693,24 @@ def _selected_vertex_data():
 
 
 def _set_points(data, positions):
+    """Koseleri dunya konumlarina tasi. Undo kapaliyken (modal surukleme) obje basina tek MFnMesh.setPoints;
+    undo acikken (bitiste sonuc: tek undo adimi) kose basina xform."""
+    if cmds.undoInfo(q=True, stateWithoutFlush=True) or not isinstance(data, _VertexData):
+        for (obj, vid, _p, _n), q in zip(data, positions):
+            cmds.xform('%s.vtx[%d]' % (obj, vid), worldSpace=True, translation=(q.x, q.y, q.z))
+        return
+    if data.meshes is None:
+        data.meshes = {}
+        for obj, _vid, _p, _n in data:
+            if obj not in data.meshes:
+                fn = _mesh_fn(obj)[0]
+                data.meshes[obj] = (fn, fn.getPoints(om.MSpace.kWorld))
+    changes = {}
     for (obj, vid, _p, _n), q in zip(data, positions):
-        cmds.xform('%s.vtx[%d]' % (obj, vid), worldSpace=True, translation=(q.x, q.y, q.z))
+        changes.setdefault(obj, []).append((vid, q))
+    for obj, items in changes.items():
+        fn, pts = data.meshes[obj]
+        _set_world_points(fn, pts, items)
 
 
 def shrink_fatten():

@@ -41,6 +41,8 @@ class ValueModal(object):
         self.dirty = False
         self.value = start
         self.last_applied = None
+        self.keys_html = None       # sabit tus listesi (ilk _show'da kurulur)
+        self._parse_cache = {}
 
     def start(self):
         self.view = omui2.M3dView.getM3dViewFromModelPanel(self.panel)
@@ -74,7 +76,7 @@ class ValueModal(object):
         return local.x() * sx, self.view.portHeight() - local.y() * sy
 
     def _compute(self):
-        num = Modal._parse(self.numeric) if self.numeric else None
+        num = Modal._parse_memo(self, self.numeric)
         if num is not None:
             v = num
         else:
@@ -112,10 +114,11 @@ class ValueModal(object):
         title = '%s  ·  %s' % (_t(self.title), self.fmt % self.value)
         if self.numeric:
             title += '   [ %s ]' % self.numeric
-        keys = [_t('<b>Fare</b> merkezden uzaklaş / yaklaş'), _t('<b>Shift</b> hassas'), _t('<b>Ctrl</b> adımlı'),
-                _t('<b>Sayı</b> yaz'), _t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
-        html = ('<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s'
-                % (title, '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)))
+        if self.keys_html is None:
+            keys = [_t('<b>Fare</b> merkezden uzaklaş / yaklaş'), _t('<b>Shift</b> hassas'), _t('<b>Ctrl</b> adımlı'),
+                    _t('<b>Sayı</b> yaz'), _t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
+            self.keys_html = '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)
+        html = '<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s' % (title, self.keys_html)
         try:
             hint_bar().show(self.widget, html)
         except Exception:

@@ -14,6 +14,7 @@ from .settings import set_setting, setting
 from .i18n import _t
 from .keys import _combo_label
 from .util import _last_view_panel, popup, undoable
+from .ui import _clamp_to_screen
 
 
 def _search_entries():
@@ -35,11 +36,11 @@ def _search_entries():
         entries.append((shown, '', ('extra', title)))
     for name in cmds.runTimeCommand(q=True, commandArray=True) or []:
         try:
-            ann = cmds.runTimeCommand(name, q=True, annotation=True) or ''
             cat = cmds.runTimeCommand(name, q=True, category=True) or ''
+            if not cat.startswith('Menu items'):
+                continue      # once kategori: aciklama yalniz menu komutlari icin sorulur
+            ann = cmds.runTimeCommand(name, q=True, annotation=True) or ''
         except Exception:
-            continue
-        if not cat.startswith('Menu items'):
             continue
         tr = TR_ALIASES.get(name)
         entries.append(('%s  [%s]' % (name, tr) if tr else name, ann, ('runtime', name)))
@@ -70,6 +71,10 @@ class SearchPalette(QtWidgets.QDialog):
         self.list.itemActivated.connect(lambda _item: self._run_current())
         self.edit.installEventFilter(self)
         self._filter('')
+
+    def reject(self):
+        """Esc: QDialog.reject yalniz gizler; WA_DeleteOnClose icin kapatmak gerekir (her F3+Esc sizmasin)."""
+        self.close()
 
     def _filter(self, text):
         words = [w for w in text.lower().split() if w]
@@ -118,7 +123,8 @@ class SearchPalette(QtWidgets.QDialog):
 
 def show_search():
     dlg = SearchPalette()
-    dlg.move(QtGui.QCursor.pos() - QtCore.QPoint(260, 20))
+    pos = QtGui.QCursor.pos()
+    dlg.move(_clamp_to_screen(pos - QtCore.QPoint(260, 20), dlg.size(), pos))
     dlg.show()
     dlg.edit.setFocus()
 

@@ -10,7 +10,7 @@ from .compat import (ALT, CTRL, EV_KEY_PRESS, EV_KEY_RELEASE, EV_MDBL, EV_MMOVE,
     EV_SHORTCUT, EV_WHEEL, KEY_EVENTS, LMB, MMB, MOUSE_EVENTS, NOBTN, Qt, QtCore, QtGui, QtWidgets, RMB, SHIFT,
     _event_global_pos)
 from .core import _state, _warn
-from .settings import setting
+from .settings import cached_setting
 from .i18n import _t
 from .keys import _combo, _key_name
 from .util import _context, _last_view_panel
@@ -30,6 +30,27 @@ def _typing():
                       QtWidgets.QAbstractSpinBox)):
         return True
     return isinstance(w, QtWidgets.QComboBox) and w.isEditable()
+
+
+# Bagli tum kombinasyonlar (etkin tablo + sculpt + baglam tablolari). Tus olaylarinin cogu (birakma, bagsiz
+# tuslar, Maya'nin kendi kisayollari) bu kumede degil: panel sorgusu (_context) yapilmadan geri cekilinir.
+_bound_cache = [None, frozenset()]     # [etkin tablo nesnesi, kume]; tablo yenilenince (yeni dict) kume yenilenir
+
+
+def _bound_combos():
+    active = _active_bindings()
+    if _bound_cache[0] is not active:
+        combos = set(active)
+        combos.update(SCULPT_KEYMAP)
+        for table in CONTEXT_KEYMAPS.values():
+            combos.update(table)
+        _bound_cache[:] = [active, frozenset(combos)]
+    return _bound_cache[1]
+
+
+def invalidate_bound_combos():
+    """Tus tablosu yeniden kurulunca (keymap._rebuild_keymap) kume de yenilensin; ayni dict nesnesi kalsa bile."""
+    _bound_cache[0] = None
 
 
 # ---------------------------------------------------------------- olay filtresi
@@ -117,7 +138,9 @@ class BlenderFilter(QtCore.QObject):
         if not name:
             return False
         combo = _combo(ev, name)
-        if combo == 'space' and setting('space_action') == 'hotbox':
+        if combo not in _bound_combos():
+            return False   # hicbir tabloda yok: panel sorgusuna gerek yok
+        if combo == 'space' and cached_setting('space_action') == 'hotbox':
             return False   # Maya'nin hotbox'i calissin
         binding = _active_bindings().get(combo)
         ctx, panel = _context()
@@ -168,6 +191,9 @@ class BlenderFilter(QtCore.QObject):
                 QtCore.QTimer.singleShot(0, functools.partial(frame_step, -1 if ev.angleDelta().y() > 0 else 1))
                 return True
             return False
+        if t == EV_MMOVE and self.nav is None and self.fwd is None and self.eat_release is None \
+                and self.alt_mmb is None:
+            return False   # siradan fare hareketi: en sik olay, ucuz cikis
         if QtWidgets.QApplication.activePopupWidget():
             return False
         if self.alt_mmb is not None:
@@ -221,7 +247,7 @@ class BlenderFilter(QtCore.QObject):
         if t != EV_MPRESS:
             return False
         button, mods = ev.button(), ev.modifiers()
-        emulate = button == LMB and mods & ALT and setting('emulate_3button')
+        emulate = button == LMB and mods & ALT and cached_setting('emulate_3button')
         if button == MMB and mods & ALT and not mods & (SHIFT | CTRL):
             ctx, panel = _context()
             if ctx != 'view':

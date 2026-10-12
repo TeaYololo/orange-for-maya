@@ -44,7 +44,7 @@ def export_for_blender(path=None, selection=True, triangulate=False):
     if not path.lower().endswith('.fbx'):
         path += '.fbx'
     if not _ensure_plugin():
-        _warn('FBX plug-in (fbxmaya) yok')
+        _warn(_t('FBX eklentisi (fbxmaya) yüklenemedi'))
         return None
     for cmd in ('FBXResetExport',
                 'FBXExportSmoothingGroups -v true',
@@ -76,7 +76,7 @@ def import_from_blender(path=None):
             return []
         path = res[0]
     if not _ensure_plugin():
-        _warn('FBX plug-in (fbxmaya) yok')
+        _warn(_t('FBX eklentisi (fbxmaya) yüklenemedi'))
         return []
     before = set(cmds.ls(assemblies=True, long=True) or [])
     for cmd in ('FBXResetImport', 'FBXImportMode -v add', 'FBXImportUpAxis y',

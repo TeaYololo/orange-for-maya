@@ -133,12 +133,16 @@ class KeyTestDialog(QtWidgets.QDialog):
         super(KeyTestDialog, self).closeEvent(ev)
 
 
-def show_key_test():
+def show_key_test(lines=None):
+    """lines: onceki pencerenin satirlari (dil degisince yeniden acilirken korunur)."""
     for w in QtWidgets.QApplication.topLevelWidgets():
         if w.objectName() == 'BlenderKontrolKeyTest':
             w.close()
             w.deleteLater()
     dlg = KeyTestDialog()
+    for line in lines or []:
+        dlg.lines.append(line)
+        dlg.log.appendPlainText(line)
     dlg.show()
     dlg.activateWindow()
     return dlg

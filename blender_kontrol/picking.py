@@ -8,30 +8,80 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui2
 
-from .compat import QtCore, QtWidgets, _np, wrapInstance
+from .compat import QtCore, QtWidgets, _numpy, wrapInstance
 from .util import _objs
 
 
 # ---------------------------------------------------------------- imlec altindaki bilesen
 class Picker(object):
-    """Fare altindaki mesh/yuz/kenar/koseyi bulur (secimi degistirmeden)."""
+    """Fare altindaki mesh/yuz/kenar/koseyi bulur (secimi degistirmeden).
 
-    def __init__(self, panel, meshes=None):
+    meshes: transform listesi (shape'ler sorgulanir); shapes: [(transform, shape)] hazir ciftler
+    (util._visible_mesh_shapes), bu durumda transform basina listRelatives yapilmaz."""
+
+    def __init__(self, panel, meshes=None, shapes=None):
         self.view = omui2.M3dView.getM3dViewFromModelPanel(panel)
         self.widget = wrapInstance(int(self.view.widget()), QtWidgets.QWidget)
         self.meshes = []
-        for obj in meshes or cmds.ls(hilite=True, long=True) or _objs():
-            for shape in cmds.listRelatives(obj, shapes=True, type='mesh', noIntermediate=True,
-                                            fullPath=True) or []:
-                self.add_mesh(obj, shape)
+        self._box = None        # numpy: (N,4,4) ters matrisler, (N,3) kutu min / max
+        self._all = None        # birlestirilmis ekran noktalari (koselerin tamami)
+        if shapes is None:
+            shapes = []
+            for obj in meshes or cmds.ls(hilite=True, long=True) or _objs():
+                for shape in cmds.listRelatives(obj, shapes=True, type='mesh', noIntermediate=True,
+                                                fullPath=True) or []:
+                    shapes.append((obj, shape))
+        if not shapes:
+            return
+        sel = om.MSelectionList()
+        for _obj, shape in shapes:
+            sel.add(shape)
+        for i, (obj, _shape) in enumerate(shapes):
+            self._add_dag(obj, sel.getDagPath(i))
 
     def add_mesh(self, transform, shape):
         sel = om.MSelectionList()
         sel.add(shape)
-        dag = sel.getDagPath(0)
+        self._add_dag(transform, sel.getDagPath(0))
+
+    def _add_dag(self, transform, dag):
         self.meshes.append({'transform': transform, 'fn': om.MFnMesh(dag), 'poly': dag,
                             'matrix': dag.inclusiveMatrix(), 'inverse': dag.inclusiveMatrixInverse(),
                             'bbox': om.MFnDagNode(dag).boundingBox, 'accel': None})
+        self._box = self._all = None
+
+    def _box_arrays(self, np):
+        """Isin-kutu testi icin toplu diziler (bir kez kurulur)."""
+        if self._box is None:
+            inv = np.array([list(m['inverse']) for m in self.meshes], dtype=float).reshape(-1, 4, 4)
+            lo = np.array([(m['bbox'].min.x, m['bbox'].min.y, m['bbox'].min.z) for m in self.meshes], dtype=float)
+            hi = np.array([(m['bbox'].max.x, m['bbox'].max.y, m['bbox'].max.z) for m in self.meshes], dtype=float)
+            pad = 0.01 * np.maximum((hi - lo).max(axis=1), 1e-6)
+            self._box = (inv, lo - pad[:, None], hi + pad[:, None])
+        return self._box
+
+    def _candidates(self, near, far):
+        """Isinin sinir kutusuna degdigi mesh indeksleri (numpy varsa tek seferde, yoksa mesh basina slab)."""
+        np = _numpy()
+        if np is None or not self.meshes:
+            o_w = near
+            return [i for i, mesh in enumerate(self.meshes)
+                    if _ray_hits_box(o_w * mesh['inverse'], om.MVector(far - near) * mesh['inverse'], mesh['bbox'])]
+        inv, lo, hi = self._box_arrays(np)
+        o = np.array([near.x, near.y, near.z, 1.0]) @ inv            # (N,4) nesne uzayi baslangic
+        d = np.array([far.x - near.x, far.y - near.y, far.z - near.z, 0.0]) @ inv
+        o, d = o[:, :3], d[:, :3]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ta = (lo - o) / d
+            tb = (hi - o) / d
+        tmin, tmax = np.minimum(ta, tb), np.maximum(ta, tb)
+        parallel = np.abs(d) < 1e-12
+        inside = (o >= lo) & (o <= hi)
+        tmin = np.where(parallel, -1e30, tmin)
+        tmax = np.where(parallel, 1e30, tmax)
+        t0, t1 = tmin.max(axis=1), tmax.min(axis=1)
+        ok = (t0 <= t1) & (t1 >= 0) & ~(parallel & ~inside).any(axis=1)
+        return [int(i) for i in np.nonzero(ok)[0]]
 
     def port(self, global_pos):
         local = self.widget.mapFromGlobal(QtCore.QPointF(global_pos))
@@ -49,11 +99,10 @@ class Picker(object):
         near, far = om.MPoint(), om.MPoint()
         self.view.viewToWorld(int(round(x)), int(round(y)), near, far)
         best = None
-        for mesh in self.meshes:
+        for i in self._candidates(near, far):
+            mesh = self.meshes[i]
             o = near * mesh['inverse']
             d = om.MVector(far - near) * mesh['inverse']
-            if not _ray_hits_box(o, d, mesh['bbox']):
-                continue
             if mesh['accel'] is None:
                 mesh['accel'] = mesh['fn'].autoUniformGridParams()
             res = mesh['fn'].closestIntersection(om.MFloatPoint(o), om.MFloatVector(d.normal()),
@@ -105,46 +154,84 @@ class Picker(object):
                 best = (d, v)
         return (mesh, best[1]) if best else None
 
+    MAX_SNAP_VERTS = 500000     # bundan buyuk mesh'ler kose snap'ine girmez
+
     def _screen_points(self, mesh):
         """Mesh'in tum koselerinin port koordinatlari (onbellekli; numpy varsa (N,2) dizi)."""
         if 'screen' in mesh:
             return mesh['screen']
         fn = mesh['fn']
-        if fn.numVertices > 500000:
+        if fn.numVertices > self.MAX_SNAP_VERTS:
             mesh['screen'] = None
             return None
-        pts = fn.getPoints(om.MSpace.kWorld)
-        if _np is not None:
-            arr = _np.array([(p.x, p.y, p.z, 1.0) for p in pts])
-            mv = _np.array(list(self.view.modelViewMatrix())).reshape(4, 4)
-            pj = _np.array(list(self.view.projectionMatrix())).reshape(4, 4)
-            clip = arr @ mv @ pj
-            w = clip[:, 3].copy()
-            behind = w <= 1e-9
-            w[behind] = 1.0
-            sx = (clip[:, 0] / w + 1.0) * 0.5 * self.view.portWidth()
-            sy = (clip[:, 1] / w + 1.0) * 0.5 * self.view.portHeight()
-            res = _np.stack([sx, sy], axis=1)
-            res[behind] = 1e9
-            mesh['screen'] = res
+        np = _numpy()
+        if np is not None:
+            mesh['screen'] = self._project(np, self._world_array(np, mesh))
         else:
-            mesh['screen'] = [self.screen(p) for p in pts]
+            mesh['screen'] = [self.screen(p) for p in fn.getPoints(om.MSpace.kWorld)]
         return mesh['screen']
+
+    @staticmethod
+    def _world_array(np, mesh):
+        """(N,3) dunya noktalari. Olculen: getPoints + kapsama 100k kosede ~47 ms; xform -q 170 ms, np.array(MPointArray)
+        108 ms (nokta basina Python nesnesi)."""
+        if mesh['fn'].numVertices == 0:
+            return np.zeros((0, 3))
+        return np.array([(p.x, p.y, p.z) for p in mesh['fn'].getPoints(om.MSpace.kWorld)], dtype=float)
+
+    def _project(self, np, world):
+        """(N,3) dunya -> (N,2) port koordinati; kameranin arkasindakiler 1e9."""
+        if len(world) == 0:
+            return np.zeros((0, 2))
+        arr = np.hstack([world, np.ones((len(world), 1))])
+        mv = np.array(list(self.view.modelViewMatrix())).reshape(4, 4)
+        pj = np.array(list(self.view.projectionMatrix())).reshape(4, 4)
+        clip = arr @ mv @ pj
+        w = clip[:, 3].copy()
+        behind = w <= 1e-9
+        w[behind] = 1.0
+        sx = (clip[:, 0] / w + 1.0) * 0.5 * self.view.portWidth()
+        sy = (clip[:, 1] / w + 1.0) * 0.5 * self.view.portHeight()
+        res = np.stack([sx, sy], axis=1)
+        res[behind] = 1e9
+        return res
+
+    def _all_screen_points(self, np):
+        """Tum mesh'lerin ekran noktalari tek dizide: (noktalar (M,2), mesh indeksleri (M,), yerel kose (M,))."""
+        if self._all is None:
+            parts, owner, local = [], [], []
+            for i, mesh in enumerate(self.meshes):
+                n = mesh['fn'].numVertices
+                if n == 0 or n > self.MAX_SNAP_VERTS:
+                    continue
+                parts.append(self._world_array(np, mesh))
+                owner.append(np.full(n, i, dtype=int))
+                local.append(np.arange(n))
+            if parts:
+                self._all = (self._project(np, np.vstack(parts)), np.concatenate(owner), np.concatenate(local))
+            else:
+                self._all = (np.zeros((0, 2)), np.zeros(0, dtype=int), np.zeros(0, dtype=int))
+        return self._all
 
     def nearest_vertex(self, global_pos, radius=24):
         """Ekran uzayinda fareye en yakin kose (ray gerektirmez, Blender snap gibi): (mesh, vid) ya da None."""
         px, py = self.port(global_pos)
+        np = _numpy()
+        if np is not None:
+            pts, owner, local = self._all_screen_points(np)
+            if len(pts) == 0:
+                return None
+            d2 = (pts[:, 0] - px) ** 2 + (pts[:, 1] - py) ** 2
+            i = int(d2.argmin())      # kare basina tek argmin, mesh sayisindan bagimsiz
+            if float(d2[i]) ** 0.5 > radius:
+                return None
+            return self.meshes[int(owner[i])], int(local[i])
         best = None
         for mesh in self.meshes:
             pts = self._screen_points(mesh)
-            if pts is None or len(pts) == 0:
+            if not pts:
                 continue
-            if _np is not None:
-                d2 = (pts[:, 0] - px) ** 2 + (pts[:, 1] - py) ** 2
-                i = int(d2.argmin())
-                d = float(d2[i]) ** 0.5
-            else:
-                i, d = min(((k, math.hypot(x - px, y - py)) for k, (x, y) in enumerate(pts)), key=lambda t: t[1])
+            i, d = min(((k, math.hypot(x - px, y - py)) for k, (x, y) in enumerate(pts)), key=lambda t: t[1])
             if d <= radius and (best is None or d < best[0]):
                 best = (d, mesh, i)
         return (best[1], best[2]) if best else None
@@ -326,20 +413,19 @@ def _edge_ring_pairs(mesh, edge):
     return list(reversed(back)) + [(v0, v1)] + fwd, closed
 
 
-_graph_cache = {}
+_graph_cache = {}     # {yol: (imza, MeshGraph)}; sahne yeni / acilinca modal._abort_modal temizler
 
 
 def _mesh_graph(fn, path):
-    """MeshGraph onbellegi: topoloji ve ilk/son nokta ayniysa yeniden kurma (P3)."""
+    """MeshGraph onbellegi: topoloji ve ilk/son nokta ayniysa yeniden kurma (P3). Yol basina tek kayit."""
     pts = (fn.getPoint(0), fn.getPoint(fn.numVertices - 1)) if fn.numVertices else ()
-    key = (path, fn.numVertices, fn.numEdges, fn.numPolygons,
-           tuple(round(c, 5) for p in pts for c in (p.x, p.y, p.z)))
-    graph = _graph_cache.get(key)
-    if graph is None:
+    sig = (fn.numVertices, fn.numEdges, fn.numPolygons, tuple(round(c, 5) for p in pts for c in (p.x, p.y, p.z)))
+    entry = _graph_cache.get(path)
+    if entry is None or entry[0] != sig:
         if len(_graph_cache) > 8:
             _graph_cache.clear()
-        graph = _graph_cache[key] = MeshGraph(fn)
-    return graph
+        entry = _graph_cache[path] = (sig, MeshGraph(fn))
+    return entry[1]
 
 
 def _hops(start, neighbors):

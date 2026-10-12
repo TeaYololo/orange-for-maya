@@ -21,7 +21,8 @@ import zipfile
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST = os.path.join(ROOT, 'dist')
 PACKAGE = 'blender_kontrol'
-IGNORE = shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', 'Thumbs.db')
+IGNORE = shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store', 'Thumbs.db',
+                                *([] if sys.platform == 'win32' else ['*.mll']))
 
 PACKAGE_CONTENTS = u'''<?xml version="1.0" encoding="utf-8"?>
 <ApplicationPackage SchemaVersion="1.0.0"
@@ -88,6 +89,12 @@ def build_bundle(ver):
     os.makedirs(scripts)
     shutil.copytree(os.path.join(ROOT, PACKAGE), os.path.join(scripts, PACKAGE), ignore=IGNORE)
     io.open(os.path.join(scripts, 'userSetup.py'), 'w', encoding='utf-8').write(installer.MODULE_USERSETUP)
+    plugins = os.path.join(bundle, 'plug-ins')
+    os.makedirs(plugins)
+    shutil.copy2(os.path.join(ROOT, PACKAGE, 'orangeArray.py'), os.path.join(plugins, 'orangeArray.py'))
+    native_plugin = os.path.join(ROOT, PACKAGE, 'orangeArray.mll')
+    if sys.platform == 'win32' and os.path.isfile(native_plugin):
+        shutil.copy2(native_plugin, os.path.join(plugins, 'orangeArray.mll'))
     shutil.copytree(os.path.join(ROOT, 'icons'), os.path.join(bundle, 'icons'), ignore=IGNORE)
     contents = os.path.join(bundle, 'Contents')
     os.makedirs(contents)

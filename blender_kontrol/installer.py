@@ -42,7 +42,13 @@ import maya.utils
 def _orange_startup():
     try:
         import blender_kontrol
-        blender_kontrol.install()
+        updated = blender_kontrol.update.apply_pending_update()
+        if updated:
+            # installer.start() yeni paketi zaten yukledi; bootstrap degiskenini de ona bagla.
+            import blender_kontrol
+        else:
+            blender_kontrol.install()
+        blender_kontrol.update.schedule_startup_check()
     except Exception as exc:
         print("[Orange] could not start: %s" % exc)
 
@@ -117,14 +123,53 @@ def copy_package(source_dir, target_dir):
     dst = os.path.join(target_dir, PACKAGE)
     if _norm(dst) == _norm(src):
         return dst
-    if os.path.isdir(dst):
-        shutil.rmtree(dst)
-    shutil.copytree(src, dst, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    # Once yeni kopyayi yanina yaz, sonra tek adimda yer degistir: kopyalama yarida kalirsa (disk, izin,
+    # kilitli dosya) eski kurulum oldugu gibi kalir ve Maya bir sonraki acilista yine baslar.
+    fresh, backup = dst + '.new', dst + '.old'
+    for stale in (fresh, backup):
+        if os.path.isdir(stale):
+            shutil.rmtree(stale)
+    shutil.copytree(src, fresh, ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+    had_old = os.path.isdir(dst)
+    if had_old:
+        os.rename(dst, backup)
+    try:
+        os.rename(fresh, dst)
+    except OSError:
+        if had_old and not os.path.isdir(dst):
+            os.rename(backup, dst)
+        shutil.rmtree(fresh, ignore_errors=True)
+        raise
+    if had_old:
+        shutil.rmtree(backup, ignore_errors=True)
     return dst
 
 
+def _replace_file(src, dst):
+    """Dosyayi ustune yaz; Windows'ta yuklu bir .mll kopyalanamaz ama yeniden adlandirilabilir:
+    eskisini .old yapip yenisini yaz (Maya bir sonraki acilista yeni dosyayi yukler)."""
+    try:
+        shutil.copy2(src, dst)
+        return
+    except (IOError, OSError):
+        if not os.path.exists(dst):
+            raise
+    old = dst + '.old'
+    if os.path.exists(old):
+        try:
+            os.remove(old)
+        except OSError:
+            pass
+    os.rename(dst, old)
+    try:
+        shutil.copy2(src, dst)
+    except (IOError, OSError):
+        os.rename(old, dst)
+        raise
+
+
 def build_module(source_dir, module_root):
-    """Modul klasorunu kur: scripts/ (paket + userSetup.py) ve icons/."""
+    """Modul klasorunu kur: scripts/, Maya plug-ins/ ve icons/."""
     scripts = os.path.join(module_root, 'scripts')
     copy_package(source_dir, scripts)
     with io.open(os.path.join(scripts, 'userSetup.py'), 'w', encoding='utf-8') as fh:
@@ -135,6 +180,17 @@ def build_module(source_dir, module_root):
         if os.path.isdir(icons_dst):
             shutil.rmtree(icons_dst)
         shutil.copytree(icons_src, icons_dst)
+    plugins_src = os.path.join(source_dir, PACKAGE, 'orangeArray.py')
+    plugins_dst = os.path.join(module_root, 'plug-ins')
+    native_plugin_src = os.path.join(source_dir, PACKAGE, 'orangeArray.mll')
+    copy_native = sys.platform == 'win32' and os.path.isfile(native_plugin_src)   # .mll yalniz Windows
+    if os.path.isfile(plugins_src) or copy_native:
+        if not os.path.isdir(plugins_dst):
+            os.makedirs(plugins_dst)
+        if os.path.isfile(plugins_src):
+            _replace_file(plugins_src, os.path.join(plugins_dst, 'orangeArray.py'))
+        if copy_native:
+            _replace_file(native_plugin_src, os.path.join(plugins_dst, 'orangeArray.mll'))
     return scripts
 
 
@@ -329,6 +385,10 @@ def uninstall(modules_dir=None, shelf=True, clean_legacy=True):
     modules_dir = modules_dir or default_modules_dir()
     module_root = os.path.join(modules_dir, MODULE_DIR)
     removed = []
+    update_dir = os.path.join(module_root, '.update')    # bekleyen guncelleme paketi ve isareti (update.py)
+    if os.path.isdir(update_dir):
+        shutil.rmtree(update_dir, ignore_errors=True)
+        removed.append(update_dir)
     if os.path.isdir(module_root):
         shutil.rmtree(module_root, ignore_errors=True)
         removed.append(module_root)

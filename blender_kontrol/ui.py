@@ -10,8 +10,8 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
 from .compat import Qt, QtCore, QtGui, QtWidgets, RMB, _main_window
-from .core import _warn
-from .settings import setting
+from .core import _state, _warn
+from .settings import cached_setting
 from .util import _NoUndo, undoable
 
 
@@ -21,6 +21,7 @@ class HintBar(object):
 
     def __init__(self):
         self.label = QtWidgets.QLabel()
+        self.label.setObjectName('BlenderKontrolHintBar')   # yeniden yuklemede bulunup silinsin
         self.label.setWindowFlags(Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint |
                                   Qt.WindowType.WindowTransparentForInput | Qt.WindowType.NoDropShadowWindowHint)
         self.label.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
@@ -29,19 +30,27 @@ class HintBar(object):
         self.label.setStyleSheet(
             'QLabel { background: rgba(28, 28, 28, 230); color: #dddddd; padding: 6px 10px;'
             ' border-top: 2px solid #e8a33d; font-size: 12px; }')
+        self.shown = None       # (html, genislik): her karede zengin metin yerlesimi yapilmasin
 
     def show(self, widget, html):
-        self.label.setText(html)
         width = max(200, widget.width() - 16)
-        self.label.setFixedWidth(width)
-        self.label.adjustSize()
+        if self.shown != (html, width):
+            self.label.setText(html)
+            self.label.setFixedWidth(width)
+            self.label.adjustSize()
+            self.shown = (html, width)
         pos = widget.mapToGlobal(QtCore.QPoint(8, widget.height() - self.label.height() - 8))
-        self.label.move(pos)
+        if pos != self.label.pos():
+            self.label.move(pos)
         if not self.label.isVisible():
             self.label.show()
 
     def hide(self):
         self.label.hide()
+
+    def dispose(self):
+        self.label.hide()
+        self.label.deleteLater()
 
 
 _hint_bar = []
@@ -60,6 +69,7 @@ class PreviewOverlay(QtWidgets.QWidget):
         super(PreviewOverlay, self).__init__(None, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint |
                                              Qt.WindowType.WindowTransparentForInput |
                                              Qt.WindowType.NoDropShadowWindowHint)
+        self.setObjectName('BlenderKontrolPreviewOverlay')
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.lines = []      # [(noktalar, QColor)]
@@ -72,12 +82,19 @@ class PreviewOverlay(QtWidgets.QWidget):
         sy = widget.height() / float(max(1, picker.view.portHeight()))
         h = picker.view.portHeight()
         colors = colors or [LOOPCUT_COLOR] * len(lines)
-        self.lines = [([QtCore.QPointF(x * sx, (h - y) * sy) for x, y in line], color)
-                      for line, color in zip(lines, colors)]
-        self.setGeometry(QtCore.QRect(widget.mapToGlobal(QtCore.QPoint(0, 0)), widget.size()))
+        new = [([QtCore.QPointF(x * sx, (h - y) * sy) for x, y in line], color)
+               for line, color in zip(lines, colors)]
+        rect = QtCore.QRect(widget.mapToGlobal(QtCore.QPoint(0, 0)), widget.size())
+        changed = new != self.lines
+        self.lines = new
+        if rect != self.geometry():
+            self.setGeometry(rect)
+            changed = True
         if not self.isVisible():
             self.show()
-        self.update()
+            changed = True
+        if changed:
+            self.update()     # viewport boyutunda ARGB pencere: yalniz cizgi degisince yeniden boyansin
 
     def paintEvent(self, _event):
         painter = QtGui.QPainter(self)
@@ -142,9 +159,11 @@ class Vp2Overlay(object):
     def __init__(self):
         self.visible = False
         self.views = []
+        self.shown = None      # (kamera, cizgiler): ayniysa yeniden cizdirme
+        self.node_made = False
 
-    @staticmethod
-    def _ensure_node():
+    def _ensure_node(self):
+        self.node_made = True
         if cmds.objExists(OVERLAY_SHAPE):
             return
         modified = cmds.file(q=True, modified=True)
@@ -161,13 +180,19 @@ class Vp2Overlay(object):
 
     def show_lines(self, picker, lines, colors=None):
         colors = colors or [LOOPCUT_COLOR] * len(lines)
+        camera = picker.view.getCamera().fullPathName()
+        new = [([(float(x), float(y)) for x, y in pts], (c.redF(), c.greenF(), c.blueF()), 2.0)
+               for pts, c in zip(lines, colors)]
+        known_view = picker.view in self.views
+        if self.visible and known_view and self.shown == (camera, new):
+            return      # her karede objExists + refresh yapilmasin
         self._ensure_node()
         store = _overlay_store()
-        store['camera'] = picker.view.getCamera().fullPathName()
-        store['lines'] = [([(float(x), float(y)) for x, y in pts], (c.redF(), c.greenF(), c.blueF()), 2.0)
-                          for pts, c in zip(lines, colors)]
+        store['camera'] = camera
+        store['lines'] = new
+        self.shown = (camera, new)
         self.visible = True
-        if picker.view not in self.views:
+        if not known_view:
             self.views.append(picker.view)
         picker.view.refresh(False, True)
 
@@ -176,7 +201,11 @@ class Vp2Overlay(object):
         had = bool(store['lines'])
         store['lines'] = []
         store['camera'] = None
+        self.shown = None
+        if not self.visible and not had and not self.node_made:
+            return      # zaten gizli (modal her karede cagirabilir)
         self.visible = False
+        self.node_made = False
         _delete_overlay_node()   # dugum yalniz onizleme gorunurken var: sahne dosyasina 'requires' bile yazilmaz
         if had:
             for view in self.views:
@@ -198,7 +227,7 @@ def preview_overlay():
     """Onizleme cizgisi katmani. Ayar 'overlay': 'qt' (varsayilan; viewport ustunde seffaf Qt penceresi) ya da
     'vp2' (orange_overlay eklentisiyle Viewport 2.0 icinde; kompozitorsuz Linux / macOS icin). Maya 2026+
     guvenilir olmayan klasorden eklenti yuklerken her oturumda izin sorar; bu yuzden VP2 isteğe baglidir."""
-    want_vp2 = setting('overlay') == 'vp2' and not _vp2_failed
+    want_vp2 = cached_setting('overlay') == 'vp2' and not _vp2_failed
     if _overlay:
         current = _overlay[0]
         if isinstance(current, Vp2Overlay) == want_vp2:
@@ -232,6 +261,8 @@ def shutdown_overlay():
     for w in _overlay:
         try:
             w.hide()
+            if isinstance(w, QtWidgets.QWidget):
+                w.deleteLater()     # her yeniden yuklemede bir ARGB pencere sizmasin
         except Exception:
             pass
     del _overlay[:]
@@ -241,6 +272,18 @@ def shutdown_overlay():
             cmds.unloadPlugin(PLUGIN_NAME, force=True)
         except Exception:
             pass
+
+
+def shutdown_ui():
+    """Kaldirirken: ipucu cubugu ve onizleme katmani penceresi silinir (gizlemek yetmez: sizar)."""
+    for bar in _hint_bar:
+        try:
+            bar.dispose()
+        except Exception:
+            pass
+    del _hint_bar[:]
+    _state.pop('setting_cache', None)
+    shutdown_overlay()
 
 
 # ---------------------------------------------------------------- pie menu
@@ -270,7 +313,9 @@ class PieMenu(QtWidgets.QWidget):
         metrics = QtGui.QFontMetrics(self.font_)
         self.sizes = [None if it is None else QtCore.QSize(metrics.horizontalAdvance(it[0]) + 24, 26)
                       for it in self.items]
-        self.resize(2 * (self.RADIUS + 130), 2 * (self.RADIUS + 50))
+        # genislik: en uzun etiket sag/sol kutuda 20 px iceri kayar (_rect); 510 px alt sinir
+        widest = max([s.width() for s in self.sizes if s is not None] or [0])
+        self.resize(max(2 * (self.RADIUS + 130), 2 * (self.RADIUS + widest - 20 + 12)), 2 * (self.RADIUS + 50))
         self.center = QtCore.QPointF(self.width() / 2.0, self.height() / 2.0)
 
     def _rect(self, i):
@@ -301,7 +346,10 @@ class PieMenu(QtWidgets.QWidget):
         return best
 
     def popup_at(self, global_pos):
-        self.move(global_pos - QtCore.QPoint(int(self.center.x()), int(self.center.y())))
+        # Ekranin disina tasmasin: pencere kaydirilir; merkez (cizim + yon testi) pencereye gore kalir,
+        # yani kaydirma kadar imlecin yanina gelir
+        self.move(_clamp_to_screen(global_pos - QtCore.QPoint(int(self.center.x()), int(self.center.y())),
+                                   self.size(), global_pos))
         self.opened = QtCore.QElapsedTimer()
         self.opened.start()
         self.show()
@@ -315,7 +363,7 @@ class PieMenu(QtWidgets.QWidget):
         idx = self._index_at(self._pos(ev))
         if idx != self.hover:
             self.hover = idx
-        self.update()
+            self.update()
 
     def mousePressEvent(self, ev):
         if ev.button() == RMB:
@@ -377,6 +425,17 @@ class PieMenu(QtWidgets.QWidget):
             p.setPen(text)
             p.drawText(r, Qt.AlignmentFlag.AlignCenter, it[0])
         p.end()
+
+
+def _clamp_to_screen(top_left, size, anchor=None):
+    """Pencere (top_left, size) imlecin bulundugu ekranin kullanilabilir alaninda kalsin."""
+    screen = QtGui.QGuiApplication.screenAt(anchor or top_left) or QtGui.QGuiApplication.primaryScreen()
+    if screen is None:
+        return top_left
+    area = screen.availableGeometry()
+    x = max(area.left(), min(top_left.x(), area.right() - size.width() + 1))
+    y = max(area.top(), min(top_left.y(), area.bottom() - size.height() + 1))
+    return QtCore.QPoint(x, y)
 
 
 def pie(title, items):

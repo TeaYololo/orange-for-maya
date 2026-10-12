@@ -153,7 +153,7 @@ class UvModal(object):
 
     # -- hesap
     def _value(self):
-        num = Modal._parse(self.numeric) if self.numeric else None
+        num = Modal._parse_memo(self, self.numeric)
         dx = (self.eff.x() - self.start_pos.x())
         dy = -(self.eff.y() - self.start_pos.y())
         ctrl = bool(Modal._mods() & CTRL)
@@ -232,12 +232,15 @@ class UvModal(object):
             title += '  ·  ' + self.axis.upper()
         if self.numeric:
             title += '   [ %s ]' % self.numeric
-        keys = [_t('<b>Fare</b> hareket (göreli)'), _t('<b>X Y</b> eksen'), _t('<b>G R S</b> değiştir'),
-                _t('<b>Ctrl</b> adımlı'), _t('<b>Shift</b> hassas'), _t('<b>Sayı</b> yaz'),
-                _t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
+        keys_html = getattr(self, 'keys_html', None)
+        if keys_html is None:       # sabit tus listesi: bir kez
+            keys = [_t('<b>Fare</b> hareket (göreli)'), _t('<b>X Y</b> eksen'), _t('<b>G R S</b> değiştir'),
+                    _t('<b>Ctrl</b> adımlı'), _t('<b>Shift</b> hassas'), _t('<b>Sayı</b> yaz'),
+                    _t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
+            keys_html = self.keys_html = '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)
         try:
             hint_bar().show(self.widget, '<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s'
-                            % (title, '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)))
+                            % (title, keys_html))
         except Exception:
             _tip(title)
 

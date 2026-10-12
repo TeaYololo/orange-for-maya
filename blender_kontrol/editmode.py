@@ -26,9 +26,23 @@ def current_comp():
     return _state['comp']
 
 
+def edit_targets():
+    """Edit modundaki (hilite) objelerin transform'lari; edit modunda degilse secili transform'lar.
+    Kafes duzenlenirken hilite listesi kafes shape'inin yolunu verir; tus komutlari (1/2/3, Ctrl+0..5,
+    modifier paneli) transform bekler, bu yuzden shape'ler ebeveynine cevrilir."""
+    out = []
+    for obj in cmds.ls(hilite=True, long=True) or _objs():
+        if cmds.nodeType(obj) != 'transform':
+            parents = cmds.listRelatives(obj, parent=True, fullPath=True) or []
+            obj = parents[0] if parents else obj
+        if obj not in out:
+            out.append(obj)
+    return out
+
+
 def enter_edit(kind=None):
     kind = kind or _state['comp']
-    objs = cmds.ls(hilite=True, long=True) or _objs()
+    objs = edit_targets()
     objs = [o for o in objs if _shape_type(o) in ('mesh', 'nurbsCurve', 'nurbsSurface')]
     if not objs:
         _msg(_t('Önce bir obje seç (sol tık)'))
@@ -37,9 +51,21 @@ def enter_edit(kind=None):
     mask = COMP_MASK[kind]
     if _shape_type(objs[0]) != 'mesh':
         mask = 'controlVertex'
+    from . import modifiers
     keep = _sel() if in_edit() else []
-    cmds.select(objs, replace=True)
-    cmds.hilite(objs, replace=True)
+    targets = []
+    for obj in objs:
+        base = obj
+        if cmds.nodeType(obj) == 'mesh':
+            parents = cmds.listRelatives(obj, parent=True, fullPath=True) or []
+            base = parents[0] if parents else obj
+        cage = modifiers.enter_source_edit(base) if cmds.nodeType(base) == 'transform' else None
+        targets.append(cage or obj)
+    # Existing result-component indices do not map safely back through topology-changing modifiers.
+    if any(target != obj for target, obj in zip(targets, objs)):
+        keep = []
+    cmds.select(targets, replace=True)
+    cmds.hilite(targets, replace=True)
     # Maya 2027'de dagMenuProc'un doMenuComponentSelectionExt'i maskeleri ayarlamiyor (tiklayinca
     # hicbir sey secilmiyordu); F8 + F9/F10/F11 yolu: bilesen modu + acik maske.
     cmds.selectMode(component=True)
@@ -61,6 +87,12 @@ def enter_edit(kind=None):
 
 def exit_edit():
     objs = cmds.ls(hilite=True, long=True) or cmds.ls(sl=True, objectsOnly=True, long=True) or []
+    from . import modifiers
+    for obj in objs:
+        try:
+            modifiers.exit_source_edit(obj)
+        except Exception:
+            pass
     try:
         if cmds.selectType(q=True, meshComponents=True):   # coklu bilesen modunu birakma
             cmds.selectType(meshComponents=False)

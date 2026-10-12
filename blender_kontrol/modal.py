@@ -11,13 +11,13 @@ import maya.api.OpenMayaUI as omui2
 
 from .compat import (ALT, CTRL, EV_KEY_PRESS, EV_KEY_RELEASE, EV_MMOVE, EV_MPRESS, EV_MRELEASE, EV_SHORTCUT,
     EV_WHEEL, LMB, MMB, NOBTN, Qt, QtCore, QtGui, QtWidgets, RMB, SHIFT, wrapInstance)
-from .core import _current_filter_set_modal, _filter, _msg, _tip, _warn, run_after_op
+from .core import _current_filter_set_modal, _filter, _msg, _state, _tip, _warn, run_after_op
 from .settings import FRAME_NAMES, PIVOT_NAMES, SNAP_NAMES, set_setting, setting
 from .i18n import _t
 from .keys import QT_KEYS, _phys
-from .util import _face_normal, _last_view_panel, _sel, _visible_meshes
+from .util import _face_normal, _last_view_panel, _ranges_named, _sel, _visible_mesh_shapes
 from .ui import AXIS_COLORS, NORMAL_COLOR, _hint_bar, _overlay, hint_bar, preview_overlay
-from .picking import Picker
+from .picking import Picker, _graph_cache
 from .editmode import in_edit
 from .cursor import cursor_node, cursor_pos
 
@@ -77,6 +77,14 @@ class Modal(object):
         self.snap_picker = None
         self.pivots = None          # 'individual': [(bilesenler, MPoint)]
         self.frames = None
+        self.soft_on = False        # soft select acik mi (baslangicta bir kez sorulur)
+        self.grid_step = 1.0        # snap adimi (baslangicta bir kez okunur)
+        self.unit_scale = 1.0       # sahne birimi / cm (sayi girisindeki 2m, 10cm icin)
+        self.obj_pos = None         # obje modu: {obje: baslangic pivotu (MVector)} (_orbit_objects)
+        self._cur_pos = None        # obje modu: {obje: su anki pivot} (kendimiz izleriz, her karede sorgu yok)
+        self._parse_cache = {}      # sayi girisi metni -> deger
+        self._hint_static = None    # (anahtar, tus listesi HTML'i): sabit kisim kare basina kurulmaz
+        self._drawn = None          # son cizilen kisit cizgisinin anahtari
 
     # -- kurulum
     def start(self):
@@ -92,9 +100,13 @@ class Modal(object):
         self.orientation = setting('orientation')
         self.snap_on = bool(setting('snap_on'))
         self.snap_target = setting('snap_target')
+        self.grid_step = self._grid_step()
+        self.unit_scale = self._unit_scale()
         self.center, self.pivots = self._compute_pivot()
         self.frames = self._frames()
-        self.buckets = self._soft_buckets() if self.kind in TRANSFORMS else None
+        self.soft_on = bool(self.kind in TRANSFORMS and self.edit and cmds.softSelect(q=True, softSelectEnabled=True))
+        self.buckets = self._soft_buckets() if self.soft_on else None
+        self.obj_pos = self._object_pivots()
         self.raw_last = QtGui.QCursor.pos()
         self.eff = QtCore.QPointF(self.raw_last)
         self.start_pos = QtCore.QPointF(self.eff)
@@ -287,18 +299,8 @@ class Modal(object):
         unit = [om.MVector(1, 0, 0), om.MVector(0, 1, 0), om.MVector(0, 0, 1)]
         local = self._local_axes()
         view = [om.MVector(self.right_dir), om.MVector(self.up_dir), -om.MVector(self.view_dir)]
-        normal = list(local)
-        if self.edit:
-            try:
-                n = self._selection_normal()
-            except Exception:
-                n = None
-            if n is not None:
-                t = self.right_dir - n * (self.right_dir * n)
-                if t.length() < 1e-6:
-                    t = self.up_dir - n * (self.up_dir * n)
-                x = t.normal()
-                normal = [x, (n ^ x).normal(), om.MVector(n)]
+        # 'normal' edit modunda secimin normalini ister (yuz basina API sorgusu): yalniz istenince (_frame)
+        normal = None if self.edit else list(local)
         cursor = unit
         node = cursor_node(create=False)
         if node:
@@ -315,8 +317,26 @@ class Modal(object):
         return {'global': unit, 'local': local, 'normal': normal, 'view': view,
                 'cursor': cursor, 'parent': parent}
 
+    def _normal_frame(self):
+        """Secimin ortalama normalinden cerceve (Z = normal); normal yoksa lokal eksenler."""
+        try:
+            n = self._selection_normal()
+        except Exception:
+            n = None
+        if n is None:
+            return list(self.frames['local'])
+        t = self.right_dir - n * (self.right_dir * n)
+        if t.length() < 1e-6:
+            t = self.up_dir - n * (self.up_dir * n)
+        x = t.normal()
+        return [x, (n ^ x).normal(), om.MVector(n)]
+
     def _frame(self, name=None):
-        return self.frames.get(name or self.orientation) or self.frames['global']
+        name = name or self.orientation
+        axes = self.frames.get(name)
+        if axes is None and name == 'normal':
+            axes = self.frames['normal'] = self._normal_frame()
+        return axes or self.frames['global']
 
     def _frame_euler(self, name):
         x, y, z = self._frame(name)
@@ -335,7 +355,7 @@ class Modal(object):
             return None
         suffix = {om.MFn.kMeshVertComponent: 'vtx', om.MFn.kMeshEdgeComponent: 'e',
                   om.MFn.kMeshPolygonComponent: 'f', om.MFn.kCurveCVComponent: 'cv'}
-        groups = {}
+        groups = {}     # agirlik -> {(yol, bilesen adi): [indeks]}
         sel = om.MGlobal.getRichSelection().getSelection()
         for i in range(sel.length()):
             try:
@@ -345,14 +365,30 @@ class Modal(object):
             if comp.isNull() or comp.apiType() not in suffix:
                 continue
             fn = om.MFnSingleIndexedComponent(comp)
-            path = dag.fullPathName()
-            name = suffix[comp.apiType()]
+            key = (dag.fullPathName(), suffix[comp.apiType()])
             for k, idx in enumerate(fn.getElements()):
                 w = fn.weight(k).influence if fn.hasWeights else 1.0
                 if w < 1e-3:
                     continue
-                groups.setdefault(round(w * 32) / 32.0, []).append('%s.%s[%d]' % (path, name, idx))
-        return [(comps, w) for w, comps in sorted(groups.items())] or None
+                groups.setdefault(round(w * 32) / 32.0, {}).setdefault(key, []).append(idx)
+        # 'yol.vtx[a:b]' araliklari: move/rotate/scale'e her karede binlerce ad yerine birkac dizgi gider
+        out = []
+        for w, by_obj in sorted(groups.items()):
+            comps = []
+            for (path, name), ids in by_obj.items():
+                comps += _ranges_named(path, name, ids)
+            out.append((comps, w))
+        return out or None
+
+    def _object_pivots(self):
+        """Obje modunda secili transform'larin pivotlari (dunya); surukleme boyunca kendimiz izleriz."""
+        if self.edit or self.kind not in TRANSFORMS:
+            return None
+        out = {}
+        for obj in cmds.ls(self.sel, type='transform', long=True) or []:
+            out[obj] = om.MVector(*cmds.xform(obj, q=True, worldSpace=True, rotatePivot=True))
+        self._cur_pos = dict(out)
+        return out
 
     def _targets(self):
         """[(bilesenler, agirlik, pivot)]"""
@@ -378,8 +414,15 @@ class Modal(object):
         obje modunda objenin pivotunu secilen pivot etrafinda kendimiz yorungeye sokariz."""
         if self.edit:
             return
-        for obj in cmds.ls(comps, type='transform', long=True) or []:
-            p = om.MVector(*cmds.xform(obj, q=True, worldSpace=True, rotatePivot=True))
+        if self.obj_pos is None:
+            self.obj_pos = self._object_pivots()
+        if not self.obj_pos:
+            return
+        objs = [c for c in comps if c in self.obj_pos]
+        if not objs and comps:
+            objs = [o for o in cmds.ls(comps, type='transform', long=True) or [] if o in self.obj_pos]
+        for obj in objs:
+            p = self._cur_pos[obj]
             d = p - om.MVector(piv)
             if rotation is not None:
                 d = d.rotateBy(rotation)
@@ -389,7 +432,9 @@ class Modal(object):
                 d = sum((axes[i] * ((d * axes[i]) * sv[i]) for i in range(3)), om.MVector())
             new = om.MVector(piv) + d
             if (new - p).length() > 1e-9:
-                cmds.move(new.x - p.x, new.y - p.y, new.z - p.z, obj, relative=True, worldSpace=True)
+                # mutlak: pivot su noktaya gelsin (sorgu yok, obje basina tek komut)
+                cmds.move(new.x, new.y, new.z, obj, absolute=True, worldSpace=True, rotatePivotRelative=True)
+                self._cur_pos[obj] = new
 
     def _reset_applied(self):
         self.applied = {'move': om.MVector(), 'rotate': 0.0, 'scale': 1.0,
@@ -399,6 +444,8 @@ class Modal(object):
         self.total_angle = 0.0
         self.track = []
         self.tb_last = QtCore.QPointF(self.eff) if hasattr(self, 'eff') else None
+        if self.obj_pos is not None:
+            self._cur_pos = dict(self.obj_pos)     # geri alindi: izlenen pivotlar baslangica (kayma birikmesin)
 
     # -- ekran / dunya donusumleri
     def _port(self, global_pos):
@@ -443,8 +490,17 @@ class Modal(object):
 
     # -- sayi girisi
     @classmethod
-    def _parse(cls, text):
-        """'2*3', '-1.5', '90d', '2m', '10cm', 'pi/2', 'sqrt(2)' -> float (sahne birimi / derece)."""
+    def _unit_scale(cls):
+        """Sahne birimi kac cm (sayi girisindeki 2m, 10cm icin)."""
+        try:
+            return cls.UNIT_CM.get(cmds.currentUnit(q=True, linear=True), 1.0)
+        except Exception:
+            return 1.0
+
+    @classmethod
+    def _parse(cls, text, unit_scale=None):
+        """'2*3', '-1.5', '90d', '2m', '10cm', 'pi/2', 'sqrt(2)' -> float (sahne birimi / derece).
+        unit_scale: sahne birimi (cm); verilmezse sorulur."""
         expr = text.replace(',', '.').replace('°', 'd').strip().lower()
         if not expr:
             return None
@@ -455,10 +511,7 @@ class Modal(object):
                 return repr(value)
             if unit in ('r', 'rad'):
                 return repr(math.degrees(value))
-            try:
-                scene = cls.UNIT_CM.get(cmds.currentUnit(q=True, linear=True), 1.0)
-            except Exception:
-                scene = 1.0
+            scene = unit_scale if unit_scale is not None else cls._unit_scale()
             return repr(value * cls.UNIT_CM[unit] / scene)
 
         expr = re.sub(r'(\d+(?:\.\d+)?)\s*(mm|cm|km|mi|m|in|ft|yd|deg|rad|d|r)(?![a-z])', unit_sub, expr)
@@ -472,14 +525,29 @@ class Modal(object):
         except Exception:
             return None
 
+    @staticmethod
+    def _parse_memo(owner, text):
+        """Modal'lar sayi girisini her karede ayristiriyordu (regex + eval + birim sorgusu): metin basina bir kez.
+        owner: _parse_cache sozlugu olan (ya da verilecek) herhangi bir modal."""
+        cache = getattr(owner, '_parse_cache', None)
+        if cache is None:
+            cache = owner._parse_cache = {}
+        try:
+            return cache[text]
+        except KeyError:
+            if len(cache) > 64:
+                cache.clear()
+            value = cache[text] = Modal._parse(text, getattr(owner, 'unit_scale', None)) if text else None
+            return value
+
     def _number(self):
-        return self._parse(self.numeric)
+        return self._parse_memo(self, self.numeric)
 
     def _number_vector(self):
         """Tab ile girilen eksen bazli degerler (G 1 Tab 2 Enter) -> MVector ya da None."""
         if not self.fields:
             return None
-        vals = [self._parse(f) or 0.0 for f in self.fields]
+        vals = [self._parse_memo(self, f) or 0.0 for f in self.fields]
         axes = self._frame(self.constraint[1] if self.constraint else None)
         return axes[0] * vals[0] + axes[1] * vals[1] + axes[2] * vals[2]
 
@@ -512,8 +580,8 @@ class Modal(object):
                 excluded = set(cmds.ls(hilite=True, long=True) or [])
             else:
                 excluded = set(cmds.ls(self.sel, type='transform', long=True) or [])
-            meshes = [m for m in _visible_meshes() if m not in excluded]
-            self.snap_picker = Picker(self.panel, meshes=meshes)
+            shapes = [(t, s) for t, s in _visible_mesh_shapes() if t not in excluded]
+            self.snap_picker = Picker(self.panel, shapes=shapes)
         pk = self.snap_picker
         if not pk.meshes:
             return None
@@ -546,9 +614,11 @@ class Modal(object):
         self.center, self.pivots = self._compute_pivot()
         self.frames = self._frames()
         self.buckets = None
+        self.soft_on = False
         self.numeric, self.fields, self.field_axis = '', None, 0
         self.start_pos = QtCore.QPointF(self.eff)
         self.pivot_2d = self._to_screen(self.center)
+        self._drawn = None
         self._reset_applied()
 
     # -- hesaplama
@@ -591,13 +661,13 @@ class Modal(object):
         if axis is not None and not plane:
             amount = delta * axis
             if self._snapping():
-                step = self._grid_step() * (0.1 if self._fine() else 1.0)
+                step = self.grid_step * (0.1 if self._fine() else 1.0)
                 amount = round(amount / step) * step
             return axis * amount
         if plane:
             delta = delta - axis * (delta * axis)
         if self._snapping():
-            step = self._grid_step() * (0.1 if self._fine() else 1.0)
+            step = self.grid_step * (0.1 if self._fine() else 1.0)
             delta = om.MVector(*[round(v / step) * step for v in (delta.x, delta.y, delta.z)])
         return delta
 
@@ -832,6 +902,7 @@ class Modal(object):
         elif self.kind == 'attr_dist':
             self.base_dist = getattr(self, 'last_amount', 0.0)
         self.snap_picker = None
+        self._drawn = None      # kamera degisti: kisit cizgisi yeniden
         self._show()
 
     # -- kisit ekseni cizgisi (Blender: secili eksen viewport'ta renkli cizgi)
@@ -849,6 +920,13 @@ class Modal(object):
         return [(a[0] - dx, a[1] - dy), (a[0] + dx, a[1] + dy)]
 
     def _draw_constraint(self):
+        """Kisit / extrude ekseni cizgisi. Girdi (kisit, tur, pivot, kamera) degismediyse katmana dokunulmaz:
+        her karede viewport boyutunda pencere boyamak / VP2'yi tazelemek yerine yalniz degisince."""
+        key = (self.constraint, self.kind, None if self.fixed_axis is None else tuple(self.fixed_axis),
+               (self.center.x, self.center.y, self.center.z))
+        if key == self._drawn:
+            return
+        self._drawn = key
         lines, colors = [], []
         if self.constraint is not None and self.kind != 'trackball':
             axis, frame, plane = self.constraint
@@ -867,14 +945,46 @@ class Modal(object):
         try:
             if lines:
                 preview_overlay().show_lines(self, lines, colors)
-            else:
-                preview_overlay().hide()
+            elif _overlay and _overlay[0].isVisible():
+                preview_overlay().hide()        # zaten gizliyse her karede hide() cagrilmaz
         except Exception:
             pass
 
     # -- ipucu
-    def _show(self):
-        self._draw_constraint()
+    def _hint_keys(self):
+        """Tus listesi HTML'i; ~25 ceviri + dizgi kurulumu yalniz durum (tur, kisit, snap, soft...) degisince."""
+        key = (self.kind, self.constraint, self.orientation, self.edit, self.soft_on, self.snap_on,
+               tuple(self.key_hints), bool(self.wheel_attr))
+        if self._hint_static is not None and self._hint_static[0] == key:
+            return self._hint_static[1]
+        keys = []
+        if self.kind in TRANSFORMS:
+            keys += [_t('<b>X Y Z</b> eksen (2. kez: %s)') % _t('global' if self.orientation != 'global' else 'lokal'),
+                     _t('<b>Shift+X</b> düzlem'), _t('<b>C</b> kısıt kaldır'),
+                     _t('<b>Orta tuş</b> otomatik eksen (Shift: düzlem)'), _t('<b>Alt+orta tuş</b> gezin'),
+                     _t('<b>Shift</b> hassas'), _t('<b>Ctrl</b> snap (Shift+Ctrl: ince)'), _t('<b>Shift+Tab</b> snap aç/kapa'),
+                     _t('<b>G R S</b> değiştir')]
+            if self.kind == 'move':
+                keys.append(_t('<b>Tab</b> sonraki eksen (sayı girerken)'))
+            if self.kind == 'move' and self.edit:
+                keys.append(_t('<b>G G</b> kaydır (slide)'))
+            if self.kind == 'rotate':
+                keys.append(_t('<b>R R</b> serbest'))
+            if self.soft_on:
+                keys.append(_t('<b>Tekerlek</b> proportional alanı'))
+        elif self.kind == 'attr_axis':
+            keys += [_t('<b>X Y Z</b> eksene kilitle'), _t('<b>G</b> serbest taşı'), _t('<b>Ctrl</b> adımlı')]
+        else:
+            keys += [_t('<b>Ctrl</b> adımlı')]
+        keys += [_t(k) for k in self.key_hints]
+        if self.wheel_attr:
+            keys.append(_t('<b>Tekerlek</b> segment'))
+        keys += [_t('<b>Sayı</b> yaz (<b>=</b> ifade: 2m, 90d, pi)'), _t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
+        html = '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)
+        self._hint_static = (key, html)
+        return html
+
+    def _hint_html(self):
         title = _t(self.TITLES[self.kind])
         if self.constraint:
             axis, frame, plane = self.constraint
@@ -895,32 +1005,14 @@ class Modal(object):
             value = '[%s %s ]   %s' % ('=' if self.expr_mode else '', self.numeric, value)
         if self._mods() & SHIFT:
             title += '  ·  ' + _t('hassas')
-        keys = []
-        if self.kind in TRANSFORMS:
-            keys += [_t('<b>X Y Z</b> eksen (2. kez: %s)') % _t('global' if self.orientation != 'global' else 'lokal'),
-                     _t('<b>Shift+X</b> düzlem'), _t('<b>C</b> kısıt kaldır'),
-                     _t('<b>Orta tuş</b> otomatik eksen (Shift: düzlem)'), _t('<b>Alt+orta tuş</b> gezin'),
-                     _t('<b>Shift</b> hassas'), _t('<b>Ctrl</b> snap (Shift+Ctrl: ince)'), _t('<b>Shift+Tab</b> snap aç/kapa'),
-                     _t('<b>G R S</b> değiştir')]
-            if self.kind == 'move':
-                keys.append(_t('<b>Tab</b> sonraki eksen (sayı girerken)'))
-            if self.kind == 'move' and self.edit:
-                keys.append(_t('<b>G G</b> kaydır (slide)'))
-            if self.kind == 'rotate':
-                keys.append(_t('<b>R R</b> serbest'))
-            if cmds.softSelect(q=True, softSelectEnabled=True):
-                keys.append(_t('<b>Tekerlek</b> proportional alanı'))
-        elif self.kind == 'attr_axis':
-            keys += [_t('<b>X Y Z</b> eksene kilitle'), _t('<b>G</b> serbest taşı'), _t('<b>Ctrl</b> adımlı')]
-        else:
-            keys += [_t('<b>Ctrl</b> adımlı')]
-        keys += [_t(k) for k in self.key_hints]
-        if self.wheel_attr:
-            keys.append(_t('<b>Tekerlek</b> segment'))
-        keys += [_t('<b>Sayı</b> yaz (<b>=</b> ifade: 2m, 90d, pi)'), _t('<b>Sol tık/Enter</b> onay'), _t('<b>Sağ tık/Esc</b> iptal')]
         html = ('<span style="color:#e8a33d; font-weight:bold">%s</span>'
                 '&nbsp;&nbsp;&nbsp;<span style="color:#ffffff">%s</span><br>%s'
-                % (title, value, '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)))
+                % (title, value, self._hint_keys()))
+        return html, title, value
+
+    def _show(self):
+        self._draw_constraint()
+        html, title, value = self._hint_html()
         try:
             hint_bar().show(self.widget, html)
         except Exception:
@@ -978,7 +1070,7 @@ class Modal(object):
                 cmds.setAttr(plug, max(1, cmds.getAttr(plug) + (1 if up else -1)))
             self.last_value = 'Segment: %d' % cmds.getAttr('%s.%s' % (self.nodes[0], self.wheel_attr))
             self._show()
-        elif self.kind in TRANSFORMS and cmds.softSelect(q=True, softSelectEnabled=True):
+        elif self.kind in TRANSFORMS and self.soft_on:
             self._revert()
             dist = cmds.softSelect(q=True, softSelectDistance=True)
             cmds.softSelect(edit=True, softSelectDistance=dist * (1.15 if up else 1 / 1.15))
@@ -1164,7 +1256,9 @@ def _snapshot_attrs(nodes):
 
 
 def _abort_modal(*_):
-    """Suren G/R/S, loop cut vb. islemi geri alma yapmadan kapat (sahne degistiyse undo tehlikeli)."""
+    """Suren G/R/S, loop cut vb. islemi geri alma yapmadan kapat (sahne degistiyse undo tehlikeli).
+    Sahne yeni / acildi olaylarina da baglidir: mesh grafigi onbellegi (yol -> graf) burada temizlenir."""
+    _graph_cache.clear()
     filt = _filter()
     modal = filt.modal if filt else None
     if modal is None:
@@ -1199,11 +1293,22 @@ def _on_app_state(state):
     if state == Qt.ApplicationState.ApplicationActive:
         return
     filt = _filter()
-    if filt and filt.modal:
+    if not filt:
+        return
+    if filt.modal:
         try:
             filt.modal.finish(True)
         except Exception:
             _abort_modal()
+    # Fare tusu basiliyken uygulama degistiyse (orta tus + Alt+Tab) birakma olayi Maya'ya hic gelmez;
+    # surdurulen navigasyon / kement / yutulan birakma durumu kalirsa donuste her fare olayi yutulur.
+    if filt.fwd is not None:
+        prev = _state.pop('lasso_prev', None) or 'selectSuperContext'
+        try:
+            cmds.setToolTo(prev)
+        except Exception:
+            pass
+    filt.nav = filt.fwd = filt.eat_release = filt.alt_mmb = None
 
 
 def start_modal(kind, panel=None, keep_undo=False, **kwargs):

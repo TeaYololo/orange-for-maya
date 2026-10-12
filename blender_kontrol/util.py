@@ -77,13 +77,16 @@ def _deferred(fn, *_):
 
 # ---------------------------------------------------------------- modelleme
 def _face_normal(faces):
-    total = om.MVector()
-    for face in cmds.ls(faces, flatten=True):
+    """Yuzlerin ortalama dunya normali. Yuzler objeye gore gruplanir: obje basina tek MFnMesh."""
+    by_obj = {}
+    for face in cmds.ls(faces, flatten=True, long=True) or []:
         obj, idx = face.split('.f[')
-        sl = om.MSelectionList()
-        sl.add(obj)
-        fn = om.MFnMesh(sl.getDagPath(0))
-        total += fn.getPolygonNormal(int(idx.rstrip(']')), om.MSpace.kWorld)
+        by_obj.setdefault(obj, []).append(int(idx.rstrip(']')))
+    total = om.MVector()
+    for obj, ids in by_obj.items():
+        fn = _mesh_fn(obj)[0]
+        for idx in ids:
+            total += fn.getPolygonNormal(idx, om.MSpace.kWorld)
     return total.normal() if total.length() > 1e-6 else None
 
 
@@ -91,10 +94,20 @@ def _matrix_list(m):
     return [m[i] for i in range(16)]
 
 
+def _visible_mesh_shapes():
+    """[(transform, mesh_shape)] gorunur, ara olmayan mesh'ler (Picker dogrudan kullanir)."""
+    shapes = cmds.ls(type='mesh', visible=True, noIntermediate=True, long=True) or []
+    out, seen = [], set()
+    for shape in shapes:
+        transform = shape.rpartition('|')[0]
+        if transform not in seen:
+            seen.add(transform)
+            out.append((transform, shape))
+    return out
+
+
 def _visible_meshes():
-    meshes = cmds.listRelatives(cmds.ls(type='mesh', visible=True, noIntermediate=True, long=True) or [],
-                                parent=True, fullPath=True) or []
-    return list(set(meshes))
+    return [transform for transform, _shape in _visible_mesh_shapes()]
 
 
 def _last_view_panel():
@@ -157,9 +170,32 @@ def _mesh_fn(obj):
     return om.MFnMesh(dag), dag
 
 
+SET_POINT_LOOP_MAX = 256    # bu kadar koseye kadar setPoint (~40 us / kose); ustunde tek setPoints (100k mesh ~30 ms)
+
+
+def _set_world_points(fn, pts, changes):
+    """Undo kapaliyken (modal surukleme) kose konumlarini toplu yaz; kose basina xform (~2 ms) yerine.
+    fn: MFnMesh (dag yolu ile), pts: mesh'in dunya noktalari (MPointArray; guncel tutulur), changes: [(kose, nokta)]."""
+    if not changes:
+        return
+    if len(changes) <= SET_POINT_LOOP_MAX:
+        for v, p in changes:
+            pts[v] = om.MPoint(p)
+            fn.setPoint(v, pts[v], om.MSpace.kWorld)
+    else:
+        for v, p in changes:
+            pts[v] = om.MPoint(p)
+        fn.setPoints(pts, om.MSpace.kWorld)
+    fn.updateSurface()
+
+
 def _ranges(obj, kind, ids):
     """[3,4,5,9] -> ['obj.f[3:5]', 'obj.f[9]']"""
-    name = COMP_NAME[kind]
+    return _ranges_named(obj, COMP_NAME[kind], ids)
+
+
+def _ranges_named(obj, name, ids):
+    """_ranges ile ayni; bilesen adi dogrudan verilir ('vtx', 'e', 'f', 'cv')."""
     out, ids = [], sorted(set(ids))
     i = 0
     while i < len(ids):

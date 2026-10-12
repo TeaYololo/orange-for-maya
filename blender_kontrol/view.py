@@ -17,13 +17,15 @@ from .cursor import cursor_node, set_cursor
 
 
 def subdiv_level(level):
-    objs = cmds.ls(hilite=True, long=True) or _objs()
-    for obj in objs:
-        for shape in cmds.listRelatives(obj, shapes=True, type='mesh', fullPath=True) or []:
-            cmds.setAttr(shape + '.displaySmoothMesh', 2 if level else 0)
-            if level:
-                cmds.setAttr(shape + '.smoothLevel', level)
-    _msg(_t('Yumuşak önizleme: %s') % (level or _t('kapalı')))
+    # Edit modunda hilite listesi kafes shape'ini verir; edit_targets transform'a cevirir.
+    from .editmode import edit_targets
+    from .modifiers import refresh_open_panels, set_subdivision
+    for obj in edit_targets():
+        if cmds.nodeType(obj) == 'transform' and (cmds.listRelatives(obj, shapes=True, type='mesh') or []):
+            set_subdivision(obj, level)
+    # Ctrl+0..5 edits the live Subdivision history node and updates the modeless panel.
+    refresh_open_panels()
+    _msg(_t('Subdivision (alt bölümleme) modifier seviyesi: %s') % (level or _t('kapalı')))
 
 
 # ---------------------------------------------------------------- gorunum

@@ -11,7 +11,7 @@ from .compat import QtCore, QtWidgets
 from .core import _JOB_KEY, _KEY, _filter, _msg, _warn
 from .settings import set_setting, setting
 from .i18n import _t
-from .ui import _hint_bar, shutdown_overlay
+from .ui import _hint_bar, shutdown_overlay, shutdown_ui
 from .mayaprefs import _apply_camera_settings, _restore_maya_defaults, _save_maya_defaults
 from .cursor import CURSOR, _deselect_cursor, _style_cursor
 from .pivot import set_snap_target
@@ -19,7 +19,7 @@ from .modal import _abort_modal, _on_app_state
 from .helptext import show_help
 from .settings_ui import show_settings
 from .diagnostics import report_issue, show_key_test
-from . import cheatsheet, hotkeys, interop, modifiers
+from . import cheatsheet, hotkeys, interop, modifiers, update
 from .events import BlenderFilter
 
 
@@ -46,6 +46,19 @@ def install(quiet=False):
     filt = BlenderFilter(app)
     app.installEventFilter(filt)
     setattr(sys.modules['__main__'], _KEY, filt)
+    try:
+        _install_rest(app, filt, quiet)
+    except Exception as exc:
+        # Filtre kurulduktan sonra bir adim patlarsa yarim kurulum kalmasin: geri al, acik hata ver.
+        try:
+            uninstall(quiet=True)
+        except Exception:
+            pass
+        raise RuntimeError('Orange could not start (%s: %s); the installation was rolled back' % (
+            type(exc).__name__, exc)) from exc
+
+
+def _install_rest(app, filt, quiet):
     _save_maya_defaults()
     try:
         cmds.selectPref(trackSelectionOrder=True)
@@ -123,8 +136,13 @@ def uninstall(quiet=False):
             pass
     try:
         shutdown_overlay()
+        shutdown_ui()       # ipucu cubugu ve onizleme penceresi silinsin (her yeniden yuklemede sizmasin)
     except Exception as exc:
         _warn('overlay: %s' % exc)
+    try:
+        modifiers.close_panels()
+    except Exception as exc:
+        _warn('modifier panel: %s' % exc)
     _restore_maya_defaults()
     _build_menu()
     if not quiet:
@@ -139,6 +157,12 @@ def reload_module():
     sys.modules'tan silinip bastan import edilir: alt modullerin birbirine verdigi eski adlar kalmaz."""
     import importlib
     uninstall(quiet=True)
+    # Modifier paneli dock icindeyken topLevelWidgets'ta gorunmez; workspaceControl'uyle birlikte silinir
+    # ve kafes duzenleme durumu (EDIT_CAGES) geri alinir, yoksa modul silinince cikti shape referans kalir.
+    try:
+        modifiers.close_panels()
+    except Exception as exc:
+        _warn('modifier panel: %s' % exc)
     for w in QtWidgets.QApplication.topLevelWidgets():
         if w.objectName().startswith('BlenderKontrol'):
             w.close()
@@ -171,11 +195,43 @@ LANGUAGES = (('auto', 'Auto (system language) / Otomatik'), ('en', 'English'), (
 
 
 def set_language(code):
-    """Dili degistir ve Orange menusunu yeni dilde yeniden kur (menu kendi callback'i icinde silinemez:
-    evalDeferred)."""
+    """Dili degistir; Orange menusunu ve acik Orange pencerelerini yeni dilde yeniden kur (menu ve pencere
+    kendi callback'i icinde silinemez: evalDeferred)."""
     set_setting('language', code)
     if not cmds.about(batch=True):
         cmds.evalDeferred(_build_menu)
+        cmds.evalDeferred(_reopen_windows)
+
+
+def _reopen_windows():
+    """Acik Orange pencerelerini durumlarini koruyarak yeni dilde yeniden ac (pencereler metinleri kurulurken
+    cevirir; yeniden cevirme yok)."""
+    windows = {}
+    for w in QtWidgets.QApplication.topLevelWidgets():
+        name = w.objectName()
+        if name.startswith('BlenderKontrol') and w.isVisible():
+            windows[name] = w
+    settings_win = windows.get('BlenderKontrolSettings')
+    if settings_win is not None:
+        page = getattr(settings_win, 'current_page', None)
+        text = settings_win.filter_edit.text() if hasattr(settings_win, 'filter_edit') else ''
+        geometry = settings_win.geometry()
+        show_settings(page=page, filter_text=text).setGeometry(geometry)
+    help_win = windows.get('BlenderKontrolHelp')
+    if help_win is not None:
+        geometry = help_win.geometry()
+        show_help().setGeometry(geometry)
+    key_test = windows.get('BlenderKontrolKeyTest')
+    if key_test is not None:
+        show_key_test(lines=list(getattr(key_test, 'lines', [])))
+    if 'BlenderKontrolUpdate' in windows:
+        update.show_update_dialog()
+    refresh = getattr(modifiers, 'refresh_open_panels', None)
+    if refresh is not None:
+        try:
+            refresh()
+        except Exception as exc:
+            _warn('modifier panel: %s' % exc)
 
 
 def _build_menu():
@@ -186,6 +242,12 @@ def _build_menu():
     if cmds.menu(name, exists=True):
         cmds.deleteUI(name)
     menu = cmds.menu(name, label='Orange', parent='MayaWindow', tearOff=True)
+    available = getattr(update, 'available_release', None)
+    if available:
+        # Acilis denetimi yeni surum buldu: pencere ancak buradan (istenince) acilir
+        cmds.menuItem(label=_t('Orange %s sürümüne güncelle...') % available.get('version', ''), parent=menu,
+                      boldFont=True, command=lambda *_: update.show_update_dialog())
+        cmds.menuItem(divider=True, parent=menu)
     cmds.menuItem(label=_t('Orange açık (Blender tuşları)'), checkBox=is_installed(), command=_toggle, parent=menu)
     cmds.menuItem(label=_t('Kısayol listesi  (F1)'), command=lambda *_: show_help(), parent=menu)
     cmds.menuItem(label=_t('Ayarlar ve kısayollar...  (Ctrl+,)'), command=lambda *_: show_settings(), parent=menu)
@@ -202,6 +264,9 @@ def _build_menu():
     cmds.menuItem(label=_t('Emulate Numpad (üst sıradaki rakamlar = numpad)'), parent=menu,
                   checkBox=bool(setting('emulate_numpad')),
                   command=lambda on: set_setting('emulate_numpad', on))
+    cmds.menuItem(label=_t('Yeni sürümleri otomatik denetle'), parent=menu,
+                  checkBox=bool(setting('auto_update_check')),
+                  command=lambda on: update.set_auto_check(on))
     cmds.menuItem(label=_t('Emulate 3 Button Mouse (Alt + sol tık = orta tuş)'), parent=menu,
                   checkBox=bool(setting('emulate_3button')),
                   command=lambda on: set_setting('emulate_3button', on))
@@ -228,6 +293,8 @@ def _build_menu():
                   command=lambda *_: show_key_test())
     cmds.menuItem(label=_t('Sorun bildir (tanılama bilgisini kopyalar)...'), parent=menu,
                   command=lambda *_: report_issue())
+    cmds.menuItem(label=_t('Güncellemeleri denetle...'), parent=menu,
+                  command=lambda *_: update.check_for_updates(force=True))
     cmds.menuItem(divider=True, parent=menu)
     cmds.menuItem(label=_t('Yeniden yükle (güncelleme sonrası)'), parent=menu,
                   command=lambda *_: cmds.evalDeferred(reload_module))

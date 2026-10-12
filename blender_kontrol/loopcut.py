@@ -8,7 +8,7 @@ import maya.api.OpenMaya as om
 from .compat import CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, EV_WHEEL, LMB, Qt, QtCore, QtGui, RMB
 from .core import _current_filter_set_modal, _msg, _warn, run_after_op
 from .i18n import _t
-from .util import _comp, _last_view_panel, _mesh_fn, _objs, _shape_type
+from .util import _comp, _last_view_panel, _mesh_fn, _objs, _set_world_points, _shape_type
 from .ui import hint_bar, preview_overlay
 from .picking import Picker, _edge_ring_pairs, _seg_dist
 from .editmode import enter_edit, in_edit
@@ -127,6 +127,7 @@ class LoopCut(object):
         if len(self.multi) < after - self.verts_before:
             return False   # esleme guvenilir degil: kaydirmadan bitir
         self.multi_obj = obj
+        self.multi_fn = None
         self.multi_dmax = 1.0 / (n + 1)
         self.multi_d = 0.0
         self.undo_prev = cmds.undoInfo(q=True, stateWithoutFlush=True)
@@ -134,9 +135,17 @@ class LoopCut(object):
         return True
 
     def _apply_multi(self, d):
-        for v, a, b, t0 in self.multi:
-            p = a + (b - a) * (t0 + d)
-            cmds.xform('%s.vtx[%d]' % (self.multi_obj, v), worldSpace=True, translation=(p.x, p.y, p.z))
+        """Kesim koselerini kaydir. Undo kapaliyken (surukleme) tek MFnMesh.setPoints; acikken (finish: sonuc
+        tek undo adimi) kose basina xform."""
+        if cmds.undoInfo(q=True, stateWithoutFlush=True):
+            for v, a, b, t0 in self.multi:
+                p = a + (b - a) * (t0 + d)
+                cmds.xform('%s.vtx[%d]' % (self.multi_obj, v), worldSpace=True, translation=(p.x, p.y, p.z))
+            return
+        if getattr(self, 'multi_fn', None) is None:
+            self.multi_fn = _mesh_fn(self.multi_obj)[0]
+            self.multi_pts = self.multi_fn.getPoints(om.MSpace.kWorld)
+        _set_world_points(self.multi_fn, self.multi_pts, [(v, a + (b - a) * (t0 + d)) for v, a, b, t0 in self.multi])
 
     def update(self, force=False):
         pos = QtGui.QCursor.pos()
@@ -145,9 +154,11 @@ class LoopCut(object):
         self.last_pos = pos
         try:
             if self.state == 'hover':
+                before = (self.edge, self.count)
                 self._hover(pos)
-                self._draw()
-                self._show()
+                if force or (self.edge, self.count) != before:   # kenar / sayi degismediyse cizim ve ipucu ayni
+                    self._draw()
+                    self._show()
             elif self.state == 'slide_multi':
                 a = self.picker.screen(self.ends[0])
                 b = self.picker.screen(self.ends[1])
@@ -174,18 +185,28 @@ class LoopCut(object):
             _warn(_t('loop cut: %s') % exc)
             self.finish(False)
 
+    def _keys_html(self, hover):
+        cache = getattr(self, '_keys_cache', None)
+        if cache is None:
+            cache = self._keys_cache = {}
+        if hover not in cache:
+            if hover:
+                keys = [_t('<b>Kenarın üzerine gel</b> (sarı çizgi = kesim yeri)'),
+                        _t('<b>Tekerlek / PageUp</b> kesim sayısı'), _t('<b>Sol tık</b> kes'),
+                        _t('<b>Sağ tık/Esc</b> iptal')]
+            else:
+                keys = [_t('<b>Fare</b> kaydır'), _t('<b>Ctrl</b> adımlı'), _t('<b>Sol tık/Enter</b> onay'),
+                        _t('<b>Sağ tık/Esc</b> ortala')]
+            cache[hover] = '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)
+        return cache[hover]
+
     def _show(self, value=''):
-        if self.state == 'hover':
+        hover = self.state == 'hover'
+        if hover:
             title = _t('LOOP CUT  ·  %d kesim') % self.count
-            keys = [_t('<b>Kenarın üzerine gel</b> (sarı çizgi = kesim yeri)'),
-                    _t('<b>Tekerlek / PageUp</b> kesim sayısı'), _t('<b>Sol tık</b> kes'),
-                    _t('<b>Sağ tık/Esc</b> iptal')]
         else:
             title = _t('KAYDIR  ·  %s') % value
-            keys = [_t('<b>Fare</b> kaydır'), _t('<b>Ctrl</b> adımlı'), _t('<b>Sol tık/Enter</b> onay'),
-                    _t('<b>Sağ tık/Esc</b> ortala')]
-        html = ('<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s'
-                % (title, '&nbsp;&nbsp;·&nbsp;&nbsp;'.join(keys)))
+        html = '<span style="color:#e8a33d; font-weight:bold">%s</span><br>%s' % (title, self._keys_html(hover))
         hint_bar().show(self.picker.widget, html)
 
     def _set_count(self, delta):

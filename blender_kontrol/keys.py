@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 import sys
 
 from .compat import ALT, CTRL, KEYPAD, Qt, SHIFT
-from .settings import setting
+from .settings import cached_setting
 
 
 # Windows scan code -> tus adi (klavye dilinden bagimsiz)
@@ -119,7 +119,7 @@ def _key_name(ev, platform=None):
     if name in SPECIAL_KEYS:
         return name
     name = phys or name
-    if name and name.isdigit() and setting('emulate_numpad'):
+    if name and name.isdigit() and cached_setting('emulate_numpad'):
         return 'np' + name   # Blender "Emulate Numpad": ust siradaki rakamlar numpad gibi
     return name
 

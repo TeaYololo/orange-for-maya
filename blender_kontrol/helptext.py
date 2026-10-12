@@ -57,7 +57,7 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>Shift + Tab</b> / Shift + Ctrl + Tab</td><td>Snap aç/kapa / snap hedefi (artım, köşe, kenar, yüz). İşlem sırasında Ctrl geçici olarak tersine çevirir</td></tr>
 <tr><td><b>Alt + G / R / S</b></td><td>Konum / döndürme / ölçeği sıfırla</td></tr>
 <tr><td><b>Ctrl + A</b></td><td>Uygula (freeze), modifier'ları uygula, geçmişi temizle, instance'ları gerçek yap</td></tr>
-<tr><td><b>Shift + A</b></td><td>Ekle (küp, küre, kamera, ışık...)</td></tr>
+<tr><td><b>Shift + A</b></td><td>Ekle (küp, küre, kamera, ışık...); yeni obje 3D imlecin olduğu yere eklenir (Shift+C: imleci sıfırla)</td></tr>
 <tr><td><b>Shift + D</b> / Alt + D</td><td>Kopyala / instance</td></tr>
 <tr><td><b>X</b> / Delete</td><td>Sil</td></tr>
 <tr><td><b>A</b> / Alt + A / Ctrl + I</td><td>Hepsini seç / seçimi kaldır / ters çevir</td></tr>
@@ -69,9 +69,7 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>Ctrl + Alt + Shift + C</b></td><td>Origin ayarla: geometriyi origin'e, origin'i geometriye / 3D imlece / kütle merkezine</td></tr>
 <tr><td><b>Shift + G</b></td><td>Grupla seç (çocuklar, ebeveyn, kardeşler, tür, layer); edit modunda benzerini seç</td></tr>
 <tr><td><b>Shift + S</b></td><td>Hizala pie: imleç/seçim → seçim/imleç/grid/orijin/aktif, pivot → imleç</td></tr>
-<tr><td><b>Shift + A</b> (3D imleç)</td><td>Yeni objeler 3D imlecin olduğu yere eklenir (Shift+C: imleci sıfırla)</td></tr>
-<tr><td><b>Ctrl + 0..5</b></td><td>Yumuşak önizleme (subdivision) seviyesi</td></tr>
-<tr><td><b>M</b></td><td>Layer'a taşı (Blender: Move to Collection)</td></tr>
+<tr><td><b>Ctrl + 0..5</b></td><td>Canlı Subdivision modifier seviyesi</td></tr>
 <tr><td><b>O</b> / Shift + O / Alt + O</td><td>Proportional editing / falloff pie / sadece bağlı parçalar</td></tr>
 <tr><td><b>B</b> / <b>W</b> / <b>C</b></td><td>Kutu seçimi / seçim aracı döngüsü (kutu, kement, fırça) / fırça ile seçim (C, sağ tık ya da Esc ile çık)</td></tr>
 <tr><td><b>Shift + R</b></td><td>Son işlemi tekrarla</td></tr>
@@ -112,7 +110,7 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>Graph Editor / Dope Sheet</b></td><td>G anahtarları fareyle taşı (X sadece zaman, Y sadece değer, kareye snap, Ctrl serbest), S zaman ölçekle, T interpolasyon, V tutamak tipi, Shift+E ekstrapolasyon, X / Delete sil, A / Alt+A, Home / Numpad . odakla, P önizleme aralığı</td></tr>
 <tr><td><b>Ctrl + Home</b> / Ctrl + End</td><td>Oynatma aralığının başı / sonu = geçerli kare</td></tr>
 <tr><td><b>F9</b></td><td>Son işlemi ayarla: son history düğümünün sayısal ayarları yüzen panelde, değiştirince anında uygulanır</td></tr>
-<tr><td><b>Modifier'lar</b></td><td>Orange menüsü → Modifier paneli: Subdivision (smooth preview), Mirror ve Array (canlı instance), Bevel, Solidify, Triangulate, Weld; aç / kapa, ayarla, uygula. Ctrl+A ile hepsini uygula</td></tr>
+<tr><td><b>Modifier'lar</b></td><td>Orange menüsü → Modifier paneli: Subdivision, Mirror, Array, Bevel, Solidify, Triangulate ve Weld tek sıralı canlı yığında. Kartları sürükleyerek sırala; aç / kapa, uygula veya kaldır. Mirror: yerel düzlem merkezi / dönüşü, yön, Merge ve kesme. Array: Relative / Constant, Object Offset ve Merge. Ctrl+A hepsini uygular</td></tr>
 <tr><td><b>Blender ile FBX</b></td><td>Orange menüsü / F3: Blender için FBX dışa aktar (metre, smoothing) ve Blender FBX içe aktar</td></tr>
 <tr><td><b>Hotkey Editor</b></td><td>Her Orange komutu Maya Hotkey Editor'da "Orange" kategorisinde: istersen Maya'nın kendi tuşlarına, rafa ya da marking menu'ye bağla</td></tr>
 <tr><td><b>Q</b></td><td>Favoriler; eklemek için F3'te bir komut seçip Ctrl+Enter</td></tr>
@@ -134,6 +132,9 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>F2</b></td><td>Yeniden adlandır</td></tr>
 <tr><td><b>F3</b></td><td>Komut ara (Blender ve Maya menü komutları)</td></tr>
 <tr><td><b>Ctrl + ,</b></td><td>Ayarlar ve kısayol düzenleyici (Orange menüsünden de açılır)</td></tr>
+<tr><td><b>Orange menüsü → Language / Dil</b></td><td>Arayüz dili: otomatik (sistem dili), English, Türkçe; menü ve açık Orange pencereleri hemen yenilenir</td></tr>
+<tr><td><b>Orange menüsü → Güncellemeler</b></td><td>"Yeni sürümleri otomatik denetle" açıkken açılışta GitHub Releases denetlenir; yeni sürüm varsa kısa bildirim ve menünün başında "... sürümüne güncelle" öğesi çıkar. "Güncellemeleri denetle..." elle denetler. İndirme Maya'nın sonraki açılışında kurulur</td></tr>
+<tr><td><b>Orange menüsü → Kısayol kartı</b></td><td>Kendi kısayollarınla yazdırılabilir tek sayfalık kart (tarayıcıda açılır)</td></tr>
 </table>
 <p style="color:gray">Blender'dan farkı: Maya'da her işlem "geçmiş" (history) bırakır; işin bitince
 Ctrl+A &gt; Geçmişi temizle. Maya'nın kendi menüleri ve Channel Box'ı (sağda) her zaman kullanılabilir.</p>
@@ -155,3 +156,4 @@ def show_help():
     text.setHtml((i18n.HELP_EN if _lang() == 'en' and i18n.HELP_EN else HELP).replace('<table>', '<table cellpadding="3">'))
     layout.addWidget(text)
     dlg.show()
+    return dlg

@@ -1,21 +1,20 @@
 # -*- coding: utf-8 -*-
-"""Ayar penceresi ve kisayol duzenleyici (Ctrl+,)."""
+"""Blender-style preferences and editable keymap for Maya."""
 from __future__ import absolute_import, division, print_function
 
 import functools
 
 import maya.cmds as cmds
 
-from .compat import EV_KEY_PRESS, Qt, QtGui, QtWidgets, _main_window
+from .compat import EV_KEY_PRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
 from .core import _state
 from .settings import FRAME_NAMES, PIVOT_NAMES, SNAP_NAMES, set_setting, setting
 from .i18n import _t
 from .keys import _combo, _combo_label, _key_name
 
 
-# ---------------------------------------------------------------- ayar penceresi (Ctrl+,)
 class SettingsDialog(QtWidgets.QDialog):
-    """Genel ayarlar + kisayol duzenleyici. Degisiklikler aninda uygulanir ve kaydedilir."""
+    """Compact Preferences window; settings save as soon as they change."""
 
     CHOICES = {
         'language': [('auto', 'Auto (system language) / Otomatik'), ('en', 'English'), ('tr', 'Türkçe')],
@@ -27,149 +26,417 @@ class SettingsDialog(QtWidgets.QDialog):
                           ('surface', 'Yüzey normaline hizala')],
         'overlay': [('qt', 'Qt katmanı (viewport üstünde pencere)'), ('vp2', 'Viewport 2.0 (orange_overlay eklentisi)')],
     }
-    CHECKS = [('emulate_numpad', 'Emulate Numpad (üst sıradaki rakamlar = numpad)'),
-              ('emulate_3button', 'Emulate 3 Button Mouse (Alt + sol tık = orta tuş)'),
-              ('zoom_to_mouse', 'Zoom to Mouse Position (tekerlek fareye doğru)'),
-              ('orbit_selection', 'Orbit Around Selection (seçimin etrafında dön)'),
-              ('snap_on', 'Snap açık (Shift+Tab)'),
-              ('destructive_edit', "Edit modunda geçmiş bırakma (Blender gibi; F9 bu modda çalışmaz, "
-                                   "Orange modifier'lı mesh'lere dokunulmaz)")]
-    LABELS = {'language': 'Language / Dil', 'space_action': 'Space tuşu', 'pivot': 'Pivot noktası',
-              'orientation': 'Dönüşüm oryantasyonu', 'snap_target': 'Snap hedefi',
-              'cursor_orient': '3D imleç yönü (Shift+sağ tık)', 'overlay': 'Önizleme çizimi (eksen, loop cut)'}
+    LABELS = {
+        'language': 'Language / Dil', 'space_action': 'Space tuşu', 'pivot': 'Pivot noktası',
+        'orientation': 'Dönüşüm oryantasyonu', 'snap_target': 'Snap hedefi',
+        'cursor_orient': '3D imleç yönü (Shift+sağ tık)', 'overlay': 'Önizleme çizimi (eksen, loop cut)',
+        'emulate_numpad': 'Emulate Numpad',
+        'emulate_3button': 'Emulate 3 Button Mouse',
+        'zoom_to_mouse': 'Zoom to Mouse Position',
+        'orbit_selection': 'Orbit Around Selection',
+        'snap_on': 'Snap açık (Shift+Tab)',
+        'destructive_edit': 'Edit modunda geçmiş bırakma (Blender gibi)',
+    }
+    # Onay kutusu etiketi sarmaz: aciklama kutunun altinda soluk satirda ve ipucunda
+    NOTES = {
+        'emulate_numpad': 'Üst sıradaki rakamlar numpad gibi çalışır (görünümler, 1 / 2 / 3 seçim modları Shift ile).',
+        'emulate_3button': 'Alt + sol tık orta tuş gibi davranır (tek tuşlu fare / dokunmatik yüzey).',
+        'zoom_to_mouse': 'Tekerlek fare imlecine doğru yakınlaştırır.',
+        'orbit_selection': 'Görünüm seçimin etrafında döner.',
+        'destructive_edit': "F9 bu modda çalışmaz; Orange modifier'lı mesh'lere dokunulmaz.",
+    }
+    PAGE_LABELS = {
+        'interface': 'Arayüz', 'modeling': 'Modelleme', 'navigation': 'Gezinme',
+        'viewport': 'Görünüm alanı', 'keymap': 'Tuş haritası',
+    }
+    NAVIGATION = [
+        ('interface', ('language', 'space_action'), ('emulate_numpad', 'emulate_3button')),
+        ('modeling', ('pivot', 'orientation', 'snap_target'), ('snap_on', 'destructive_edit')),
+        ('navigation', ('cursor_orient',), ('zoom_to_mouse', 'orbit_selection')),
+        ('viewport', ('overlay',), ()),
+    ]
+    GROUPS = ['3D Görünüm', 'Outliner', 'UV Editor', 'Graph Editor', 'Diğer']
+    CAPTURE_COLOR = QtGui.QColor(232, 163, 61)
 
-    def __init__(self):
+    _STYLE = """
+    QDialog#BlenderKontrolSettings { background:#383838; color:#dddddd; }
+    QDialog#BlenderKontrolSettings QLabel { color:#dddddd; }
+    QDialog#BlenderKontrolSettings QLineEdit,
+    QDialog#BlenderKontrolSettings QComboBox,
+    QDialog#BlenderKontrolSettings QTreeWidget {
+        background:#292929; color:#e2e2e2; border:1px solid #252525; border-radius:2px;
+        selection-background-color:#4774a7; selection-color:#ffffff;
+    }
+    QDialog#BlenderKontrolSettings QLineEdit,
+    QDialog#BlenderKontrolSettings QComboBox { min-height:23px; padding:1px 5px; }
+    QDialog#BlenderKontrolSettings QTreeWidget { alternate-background-color:#333333; outline:0; }
+    QDialog#BlenderKontrolSettings QHeaderView::section {
+        background:#303030; color:#c7c7c7; padding:4px 6px; border:0; border-right:1px solid #242424;
+        border-bottom:1px solid #202020; font-weight:normal;
+    }
+    QDialog#BlenderKontrolSettings QTreeWidget::item { min-height:23px; padding:1px 3px; }
+    QDialog#BlenderKontrolSettings QPushButton {
+        background:#505050; color:#e3e3e3; border:1px solid #252525; border-radius:2px;
+        min-height:23px; padding:2px 8px;
+    }
+    QDialog#BlenderKontrolSettings QPushButton:hover { background:#626262; }
+    QDialog#BlenderKontrolSettings QPushButton[nav="true"] {
+        text-align:left; background:transparent; border-color:transparent; padding-left:10px;
+    }
+    QDialog#BlenderKontrolSettings QPushButton[nav="true"]:checked {
+        background:#4774a7; border-color:#4774a7; color:#ffffff;
+    }
+    QDialog#BlenderKontrolSettings QLabel[role="heading"] {
+        color:#f0f0f0; font-size:13px; font-weight:500; padding:4px 0 5px;
+        border-bottom:1px solid #242424;
+    }
+    QDialog#BlenderKontrolSettings QLabel[role="muted"] { color:#aaaaaa; }
+    QDialog#BlenderKontrolSettings QLabel[role="note"] { color:#9a9a9a; font-size:11px; padding-left:22px; }
+    QDialog#BlenderKontrolSettings QGroupBox { border:0; margin-top:6px; padding-top:3px; }
+    QDialog#BlenderKontrolSettings QScrollArea { border:0; background:transparent; }
+    """
+
+    def __init__(self, page=None, filter_text=None):
         super(SettingsDialog, self).__init__(_main_window())
         self.setObjectName('BlenderKontrolSettings')
         self.setWindowTitle(_t('Orange: ayarlar'))
-        self.resize(640, 640)
-        self.capture_row = None
-        tabs = QtWidgets.QTabWidget()
-        tabs.addTab(self._general_tab(), _t('Genel'))
-        tabs.addTab(self._keymap_tab(), _t('Kısayollar'))
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(tabs)
-        close = QtWidgets.QPushButton(_t('Kapat'))
-        close.clicked.connect(self.close)
-        layout.addWidget(close, alignment=Qt.AlignmentFlag.AlignRight)
+        self.resize(760, 610)
+        self.setMinimumSize(640, 500)
+        self.setStyleSheet(self._STYLE)
+        self.capture_action = None
+        self.current_page = None
+        self._filling = False
 
-    # -- genel
-    def _general_tab(self):
+        shell = QtWidgets.QHBoxLayout(self)
+        shell.setContentsMargins(0, 0, 0, 0)
+        shell.setSpacing(0)
+
+        self.nav = QtWidgets.QWidget()
+        self.nav.setFixedWidth(148)
+        self.nav.setStyleSheet('background:#303030; border-right:1px solid #242424;')
+        nav_layout = QtWidgets.QVBoxLayout(self.nav)
+        nav_layout.setContentsMargins(8, 10, 8, 8)
+        nav_layout.setSpacing(3)
+        for i, (page_name, label) in enumerate(self.PAGE_LABELS.items()):
+            if page_name == 'keymap':
+                line = QtWidgets.QFrame()
+                line.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+                line.setStyleSheet('color:#222222; margin:5px 2px;')
+                nav_layout.addWidget(line)
+            button = QtWidgets.QPushButton(_t(label))
+            button.setCheckable(True)
+            button.setProperty('nav', True)
+            button.clicked.connect(functools.partial(self._show_page, page_name))
+            nav_layout.addWidget(button)
+            setattr(self, '_nav_' + page_name, button)
+        nav_layout.addStretch(1)
+        shell.addWidget(self.nav)
+
+        self.stack = QtWidgets.QStackedWidget()
+        self.stack.setContentsMargins(0, 0, 0, 0)
+        self._page_index = {}
+        for page_name, choices, checks in self.NAVIGATION:
+            self._add_page(page_name, choices, checks)
+        self._add_keymap_page()
+        shell.addWidget(self.stack, 1)
+        if filter_text:
+            self.filter_edit.setText(filter_text)
+        self._show_page(page if page in self._page_index else 'keymap')
+
+    def _heading(self, text):
+        label = QtWidgets.QLabel(_t(text))
+        label.setProperty('role', 'heading')
+        return label
+
+    def _muted_note(self, text):
+        label = QtWidgets.QLabel(_t(text))
+        label.setWordWrap(True)
+        label.setProperty('role', 'muted')
+        return label
+
+    def _add_page(self, page_name, choice_names, check_names):
         page = QtWidgets.QWidget()
-        form = QtWidgets.QFormLayout(page)
-        for key in ('language', 'space_action', 'pivot', 'orientation', 'snap_target', 'cursor_orient', 'overlay'):
+        outer = QtWidgets.QVBoxLayout(page)
+        outer.setContentsMargins(15, 10, 15, 10)
+        outer.setSpacing(9)
+        outer.addWidget(self._heading(self.PAGE_LABELS[page_name]))
+        form = QtWidgets.QFormLayout()
+        form.setContentsMargins(2, 4, 2, 2)
+        form.setHorizontalSpacing(14)
+        form.setVerticalSpacing(5)
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        for key in choice_names:
             box = QtWidgets.QComboBox()
             for value, label in self.CHOICES[key]:
-                box.addItem(_t(label) if key != 'language' else label, value)
+                box.addItem(_t(label), value)
             box.setCurrentIndex(max(0, box.findData(setting(key))))
             box.currentIndexChanged.connect(functools.partial(self._combo_changed, key, box))
-            form.addRow(_t(self.LABELS[key]) if key != 'language' else self.LABELS[key], box)
-        for key, label in self.CHECKS:
-            check = QtWidgets.QCheckBox(_t(label))
+            form.addRow(_t(self.LABELS[key]), box)
+        for key in check_names:
+            check = QtWidgets.QCheckBox(_t(self.LABELS[key]))
             check.setChecked(bool(setting(key)))
             check.toggled.connect(functools.partial(set_setting, key))
             form.addRow('', check)
-        vp2 = QtWidgets.QLabel(_t("Viewport 2.0 çizimi: Linux / macOS'ta önizleme çizgisi siyah kutu olarak görünüyorsa seç. "
-                                  'Maya, güvenilir olmayan klasörden eklenti yüklerken her oturumda bir kez izin sorar; '
-                                  'sormaması için Windows > Settings/Preferences > Preferences > Security bölümünde '
-                                  'Orange klasörünü güvenilir konumlara ekle.'))
-        vp2.setWordWrap(True)
-        vp2.setStyleSheet('color: gray')
-        form.addRow('', vp2)
-        note = QtWidgets.QLabel(_t('Dil değişikliği Orange menüsüne hemen, bu pencereye yeniden açılınca yansır.'))
-        note.setStyleSheet('color: gray')
-        form.addRow('', note)
-        return page
+            if key in self.NOTES:
+                check.setToolTip(_t(self.NOTES[key]))
+                note = QtWidgets.QLabel(_t(self.NOTES[key]))
+                note.setWordWrap(True)
+                note.setProperty('role', 'note')
+                form.addRow('', note)
+        outer.addLayout(form)
+        if page_name == 'viewport':
+            outer.addSpacing(7)
+            outer.addWidget(self._muted_note(
+                "Viewport 2.0 çizimi: Linux / macOS'ta önizleme çizgisi siyah kutu olarak görünüyorsa seç. "
+                'Maya, güvenilir olmayan klasörden eklenti yüklerken her oturumda bir kez izin sorar; '
+                'sormaması için Windows > Settings/Preferences > Preferences > Security bölümünde '
+                'Orange klasörünü güvenilir konumlara ekle.'))
+        if page_name == 'interface':
+            outer.addSpacing(6)
+            outer.addWidget(self._muted_note('Dil değişikliği Orange menüsüne ve açık Orange pencerelerine hemen yansır.'))
+        outer.addStretch(1)
+        self._page_index[page_name] = self.stack.addWidget(page)
 
     def _combo_changed(self, key, box, *_):
         if key == 'language':
-            from .lifecycle import set_language  # dongusel import: cagri aninda
-            set_language(box.currentData())        # Orange menusu hemen yeni dilde
+            from .lifecycle import set_language
+            set_language(box.currentData())
             return
         set_setting(key, box.currentData())
 
-    # -- kisayollar
-    def _keymap_tab(self):
-        from .keymap import BINDINGS  # dongusel import: cagri aninda
+    @classmethod
+    def _context_name(cls, binding):
+        contexts = binding.get('ctx', ())
+        for key, label in (('view', '3D Görünüm'), ('uv', 'UV Editor'), ('graph', 'Graph Editor'),
+                           ('outliner', 'Outliner'), ('other', 'Diğer')):
+            if key in contexts:
+                return label
+        return 'Diğer'
+
+    def _add_keymap_page(self):
         page = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(page)
+        layout.setContentsMargins(13, 9, 13, 8)
+        layout.setSpacing(6)
+
+        layout.addWidget(self._heading(self.PAGE_LABELS['keymap']))
+        toolbar = QtWidgets.QHBoxLayout()
+        toolbar.setSpacing(5)
+        self.search_mode = QtWidgets.QComboBox()
+        self.search_mode.addItem(_t('Ad'), 'name')
+        self.search_mode.addItem(_t('Tuş kombinasyonu'), 'key')
+        self.search_mode.setFixedWidth(123)
         self.filter_edit = QtWidgets.QLineEdit()
         self.filter_edit.setPlaceholderText(_t('Komut ya da kısayol ara...'))
-        self.filter_edit.textChanged.connect(self._apply_filter)
-        layout.addWidget(self.filter_edit)
-        self.table = QtWidgets.QTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels([_t('Komut'), _t('Kısayol'), _t('Varsayılan')])
-        self.table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self.table.verticalHeader().setVisible(False)
+        self.filter_edit.setClearButtonEnabled(True)
+        toolbar.addWidget(self.search_mode)
+        toolbar.addWidget(self.filter_edit, 1)
+        layout.addLayout(toolbar)
+
+        self.table = QtWidgets.QTreeWidget()
+        self.table.setColumnCount(3)
+        self.table.setHeaderLabels([_t('Komut'), _t('Kısayol'), _t('Varsayılan')])
+        self.table.setAlternatingRowColors(True)
+        self.table.setRootIsDecorated(True)
+        self.table.setUniformRowHeights(True)
+        self.table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.cellDoubleClicked.connect(lambda row, _col: self._start_capture(row))
-        layout.addWidget(self.table)
-        self.status = QtWidgets.QLabel(_t('Kısayolu değiştirmek için satıra çift tıkla, sonra yeni tuşa bas. '
-                                          'Esc: vazgeç, Backspace: kısayolu kaldır.'))
+        self.table.setColumnWidth(1, 116)
+        self.table.setColumnWidth(2, 116)
+        self.table.header().setStretchLastSection(False)
+        self.table.header().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        self.table.header().setSectionResizeMode(1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.table.header().setSectionResizeMode(2, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
+        self.table.setToolTip(_t('Kısayolu değiştirmek için satırdaki Kısayol alanına tıkla.'))
+        self.table.itemClicked.connect(self._item_clicked)
+        self.table.itemChanged.connect(self._item_changed)
+        self.table.installEventFilter(self)
+        self.filter_edit.textChanged.connect(self._apply_filter)
+        self.search_mode.currentIndexChanged.connect(self._apply_filter)
+        layout.addWidget(self.table, 1)
+
+        footer = QtWidgets.QHBoxLayout()
+        footer.setSpacing(5)
+        self.status = QtWidgets.QLabel(_t('Kısayolu değiştirmek için satırdaki alana tıkla. Esc: vazgeç, Backspace: kaldır.'))
+        self.status.setProperty('role', 'muted')
         self.status.setWordWrap(True)
-        layout.addWidget(self.status)
-        buttons = QtWidgets.QHBoxLayout()
-        for label, fn in ((_t('Değiştir'), lambda: self._start_capture(self.table.currentRow())),
+        footer.addWidget(self.status, 1)
+        for label, fn in ((_t('Değiştir'), self._change_selected),
                           (_t('Seçileni varsayılana döndür'), self._reset_selected),
                           (_t('Hepsini varsayılana döndür'), self._reset_all)):
             button = QtWidgets.QPushButton(label)
             button.clicked.connect(fn)
-            buttons.addWidget(button)
-        layout.addLayout(buttons)
-        self.ids = [c for c, b in BINDINGS.items() if b.get('title')]
+            footer.addWidget(button)
+        layout.addLayout(footer)
+        from .keymap import BINDINGS
+        self.ids = [combo for combo, binding in BINDINGS.items() if binding.get('title')]
         self._fill()
-        self.table.installEventFilter(self)
-        return page
+        self._page_index['keymap'] = self.stack.addWidget(page)
+
+    # -- tablo
+    def _view_state(self):
+        """Kaydirma, secili komut ve acik gruplar: _fill tabloyu bastan kurunca geri yuklenir."""
+        current = self.table.currentItem()
+        expanded = {}
+        for index in range(self.table.topLevelItemCount()):
+            group = self.table.topLevelItem(index)
+            expanded[group.data(0, Qt.ItemDataRole.UserRole + 1)] = group.isExpanded()
+        return {
+            'scroll': self.table.verticalScrollBar().value(),
+            'current': current.data(0, Qt.ItemDataRole.UserRole) if current else None,
+            'expanded': expanded,
+        }
+
+    def _restore_view_state(self, state):
+        if not state:
+            return
+        for index in range(self.table.topLevelItemCount()):
+            group = self.table.topLevelItem(index)
+            key = group.data(0, Qt.ItemDataRole.UserRole + 1)
+            if key in state['expanded']:
+                group.setExpanded(state['expanded'][key])
+            if state['current']:
+                for row in range(group.childCount()):
+                    item = group.child(row)
+                    if item.data(0, Qt.ItemDataRole.UserRole) == state['current']:
+                        self.table.setCurrentItem(item)
+        self.table.verticalScrollBar().setValue(state['scroll'])
 
     def _fill(self):
-        from .keymap import BINDINGS, _combo_for  # dongusel import: cagri aninda
-        self.table.setRowCount(len(self.ids))
-        for row, action in enumerate(self.ids):
-            current = _combo_for(action)
-            cells = (_t(BINDINGS[action]['title']), _combo_label(current) if current else '—', _combo_label(action))
-            for col, text in enumerate(cells):
-                item = QtWidgets.QTableWidgetItem(text)
-                if col == 1 and current != action:
-                    item.setForeground(QtGui.QBrush(QtGui.QColor(232, 163, 61)))   # degistirilmis
-                self.table.setItem(row, col, item)
-        self.table.resizeColumnsToContents()
-        self.table.horizontalHeader().setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        from .keymap import BINDINGS, _combo_for
+        state = self._view_state() if self.table.topLevelItemCount() else None
+        self._filling = True
+        self.table.clear()
+        groups = {}
+        for label in self.GROUPS:
+            item = QtWidgets.QTreeWidgetItem([_t(label), '', ''])
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable & ~Qt.ItemFlag.ItemIsUserCheckable)
+            item.setData(0, Qt.ItemDataRole.UserRole + 1, label)
+            item.setFirstColumnSpanned(False)
+            item.setExpanded(label != 'Diğer')
+            groups[label] = item
+        for action in self.ids:
+            binding = BINDINGS[action]
+            group_name = self._context_name(binding)
+            item = QtWidgets.QTreeWidgetItem([
+                _t(binding['title']),
+                _combo_label(_combo_for(action)) if _combo_for(action) else '—',
+                _combo_label(action),
+            ])
+            item.setData(0, Qt.ItemDataRole.UserRole, action)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(0, Qt.CheckState.Unchecked if not _combo_for(action) else Qt.CheckState.Checked)
+            item.setToolTip(0, action)
+            item.setToolTip(1, _t('Kısayolu değiştirmek için tıkla'))
+            if _combo_for(action) != action:
+                item.setForeground(1, QtGui.QBrush(self.CAPTURE_COLOR))
+            item.setForeground(2, QtGui.QBrush(QtGui.QColor(157, 157, 157)))
+            groups[group_name].addChild(item)
+        for label in self.GROUPS:
+            group = groups[label]
+            if group.childCount():
+                self.table.addTopLevelItem(group)
+        self._filling = False
         self._apply_filter(self.filter_edit.text())
+        self._restore_view_state(state)
 
-    def _apply_filter(self, text):
-        from .keymap import BINDINGS  # dongusel import: cagri aninda
-        words = [w for w in text.lower().split() if w]
-        for row in range(self.table.rowCount()):
-            hay = ' '.join(self.table.item(row, c).text() for c in range(3)).lower()
-            hay += ' ' + BINDINGS[self.ids[row]]['title'].lower()
-            self.table.setRowHidden(row, not all(w in hay for w in words))
+    def _apply_filter(self, *_):
+        words = [word for word in self.filter_edit.text().lower().split() if word]
+        mode = self.search_mode.currentData()
+        for index in range(self.table.topLevelItemCount()):
+            group = self.table.topLevelItem(index)
+            visible = False
+            for row in range(group.childCount()):
+                item = group.child(row)
+                current = item.text(1).lower()
+                default = item.text(2).lower()
+                name = item.text(0).lower()
+                haystack = ' '.join((current, default)) if mode == 'key' else ' '.join((name, current, default))
+                show = all(word in haystack for word in words)
+                item.setHidden(not show)
+                visible = visible or show
+            group.setHidden(not visible)
+            if words and visible:
+                group.setExpanded(True)
 
-    def _start_capture(self, row):
-        from .keymap import BINDINGS  # dongusel import: cagri aninda
-        if row is None or row < 0:
+    def _item_clicked(self, item, column):
+        if item.data(0, Qt.ItemDataRole.UserRole) and column == 1:
+            self._start_capture(item)
+
+    def _item_changed(self, item, column):
+        if self._filling or column != 0:
             return
-        self.capture_row = row
+        action = item.data(0, Qt.ItemDataRole.UserRole)
+        if not action:
+            return
+        from .keymap import _rebuild_keymap, _save_overrides
+        overrides = dict(_state.get('overrides') or {})
+        if item.checkState(0) == Qt.CheckState.Checked:
+            overrides.pop(action, None)
+        else:
+            overrides[action] = ''
+        _save_overrides(overrides)
+        _rebuild_keymap()
+        self._fill()
+
+    def _change_selected(self):
+        item = self.table.currentItem()
+        if item and item.data(0, Qt.ItemDataRole.UserRole):
+            self._start_capture(item)
+
+    # -- tus yakalama
+    def _start_capture(self, item):
+        action = item.data(0, Qt.ItemDataRole.UserRole) if item else None
+        if not action:
+            return
+        if self.capture_action is not None:
+            self._fill()                  # onceki satirin "Tusa bas" metnini geri al
+            item = self._item_for(action) or item
+        self.capture_action = action
         _state['capturing'] = True
+        self.table.setCurrentItem(item)
         self.table.setFocus()
-        self.status.setText(_t('Yeni kısayola bas: %s') % _t(BINDINGS[self.ids[row]]['title']))
-        self.table.item(row, 1).setText('...')
+        self.status.setText(_t('Yeni kısayola bas: %s') % _t(item.text(0)))
+        item.setText(1, _t('Tuşa bas…'))
+        item.setBackground(1, QtGui.QBrush(self.CAPTURE_COLOR))
+        item.setForeground(1, QtGui.QBrush(QtGui.QColor(20, 20, 20)))
+
+    def _item_for(self, action):
+        for index in range(self.table.topLevelItemCount()):
+            group = self.table.topLevelItem(index)
+            for row in range(group.childCount()):
+                if group.child(row).data(0, Qt.ItemDataRole.UserRole) == action:
+                    return group.child(row)
+        return None
 
     def _stop_capture(self, message=None):
-        self.capture_row = None
+        was_capturing = self.capture_action is not None
+        self.capture_action = None
         _state['capturing'] = False
-        self._fill()
+        if was_capturing:
+            self._fill()
         if message:
             self.status.setText(message)
 
+    def _cancel_capture(self):
+        """Odak baska yere gidince (tiklama, pencere degisimi, gizlenme) yakalama acik kalmasin: aksi halde
+        _state['capturing'] True kalir ve butun Orange kisayollari olur."""
+        if self.capture_action is not None:
+            self._stop_capture(_t('Vazgeçildi'))
+
     def eventFilter(self, obj, ev):
-        from .keymap import BINDINGS, _combo_for, _rebuild_keymap, _save_overrides  # dongusel import: cagri aninda
-        if self.capture_row is None or ev.type() != EV_KEY_PRESS:
+        from .keymap import BINDINGS, _combo_for, _rebuild_keymap, _save_overrides
+        if self.capture_action is None:
+            return False
+        if ev.type() == QtCore.QEvent.Type.FocusOut:
+            self._cancel_capture()
+            return False
+        if ev.type() != EV_KEY_PRESS:
             return False
         key = int(ev.key())
         if key in (int(Qt.Key.Key_Shift), int(Qt.Key.Key_Control), int(Qt.Key.Key_Alt), int(Qt.Key.Key_Meta)):
             return True
-        action = self.ids[self.capture_row]
+        action = self.capture_action
         if key == int(Qt.Key.Key_Escape):
             self._stop_capture(_t('Vazgeçildi'))
             return True
@@ -188,7 +455,7 @@ class SettingsDialog(QtWidgets.QDialog):
         message = _t('%s → %s') % (_t(BINDINGS[action]['title']), _combo_label(combo))
         for other in BINDINGS:
             if other != action and _combo_for(other) == combo:
-                overrides[other] = ''     # cakisan komutun kisayolu kaldirilir
+                overrides[other] = ''
                 message += '  ·  ' + _t('%s artık kısayolsuz') % _t(BINDINGS[other].get('title') or other)
         if combo == action:
             overrides.pop(action, None)
@@ -199,36 +466,58 @@ class SettingsDialog(QtWidgets.QDialog):
         self._stop_capture(message)
         return True
 
+    def event(self, ev):
+        if ev.type() == QtCore.QEvent.Type.WindowDeactivate:
+            self._cancel_capture()
+        return super(SettingsDialog, self).event(ev)
+
+    def hideEvent(self, ev):
+        self._cancel_capture()
+        super(SettingsDialog, self).hideEvent(ev)
+
     def _reset_selected(self):
-        from .keymap import _rebuild_keymap, _save_overrides  # dongusel import: cagri aninda
-        row = self.table.currentRow()
-        if row < 0:
+        item = self.table.currentItem()
+        action = item.data(0, Qt.ItemDataRole.UserRole) if item else None
+        if not action:
             return
+        from .keymap import _rebuild_keymap, _save_overrides
         overrides = dict(_state.get('overrides') or {})
-        overrides.pop(self.ids[row], None)
+        overrides.pop(action, None)
         _save_overrides(overrides)
         _rebuild_keymap()
         self._fill()
 
     def _reset_all(self):
-        from .keymap import _rebuild_keymap, _save_overrides  # dongusel import: cagri aninda
+        from .keymap import _rebuild_keymap, _save_overrides
         _save_overrides({})
         _rebuild_keymap()
         self._fill()
         self.status.setText(_t('Tüm kısayollar varsayılana döndü'))
 
+    def _show_page(self, page, *_):
+        self.current_page = page
+        self.stack.setCurrentIndex(self._page_index[page])
+        for name in self.PAGE_LABELS:
+            getattr(self, '_nav_' + name).setChecked(name == page)
+
+    def reject(self):
+        # Esc: QDialog.reject yalniz gizler ve closeEvent calismaz; kapatma temizligi (yakalama, menu) calissin
+        self.close()
+
     def closeEvent(self, ev):
-        from .lifecycle import _build_menu  # dongusel import: cagri aninda
+        from .lifecycle import _build_menu
+        self.capture_action = None
         _state['capturing'] = False
-        cmds.evalDeferred(_build_menu)    # menudeki onay kutulari guncellensin
+        cmds.evalDeferred(_build_menu)
         super(SettingsDialog, self).closeEvent(ev)
 
 
-def show_settings():
-    for w in QtWidgets.QApplication.topLevelWidgets():
-        if w.objectName() == 'BlenderKontrolSettings':
-            w.close()
-            w.deleteLater()
-    dlg = SettingsDialog()
-    dlg.show()
-    return dlg
+def show_settings(page=None, filter_text=None):
+    """page / filter_text: dil degisince pencere ayni sayfa ve arama metniyle yeniden acilir."""
+    for widget in QtWidgets.QApplication.topLevelWidgets():
+        if widget.objectName() == 'BlenderKontrolSettings':
+            widget.close()
+            widget.deleteLater()
+    dialog = SettingsDialog(page=page, filter_text=filter_text)
+    dialog.show()
+    return dialog

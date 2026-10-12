@@ -2,11 +2,6 @@
 """Qt / PySide2-6 uyumlulugu, olay ve dugme sabitleri, ana pencere."""
 from __future__ import absolute_import, division, print_function
 
-try:
-    import numpy as _np          # Maya 2022+ ile geliyor; ekran uzayi kose snap'i icin
-except ImportError:
-    _np = None
-
 import maya.OpenMayaUI as omui
 
 try:
@@ -43,6 +38,20 @@ NOMOD = Qt.KeyboardModifier.NoModifier
 
 
 # ---------------------------------------------------------------- yardimcilar
+_numpy_holder = []     # [modul | None]; ilk kullanimda dolar (paket importunda yuklemek acilisi 100-300 ms uzatiyor)
+
+
+def _numpy():
+    """numpy modulu (Maya 2022+ ile geliyor) ya da None. Yalniz picking kullanir; tembel yuklenir."""
+    if not _numpy_holder:
+        try:
+            import numpy
+        except ImportError:
+            numpy = None
+        _numpy_holder.append(numpy)
+    return _numpy_holder[0]
+
+
 def _main_window():
     return wrapInstance(int(omui.MQtUtil.mainWindow()), QtWidgets.QWidget)
 

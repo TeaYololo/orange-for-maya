@@ -19,6 +19,8 @@ SETTINGS = {
     'snap_on': ('bk_snapOn', 0),                  # Shift+Tab
     'snap_target': ('bk_snapTarget', 'increment'),  # increment | vertex | edge | face
     'language': ('bk_language', 'auto'),          # auto | tr | en
+    'auto_update_check': ('bk_autoUpdateCheck', 1),  # GitHub Releases kontrolu acilista
+    'skip_update_version': ('bk_skipUpdateVersion', ''),  # guncelleme bildirimi atlanan surum
     'cursor_orient': ('bk_cursorOrient', 'none'), # Shift+sag tik: none | view | surface
     'favorites': ('bk_favorites', '[]'),          # Q: JSON [[tur, ad], ...]
     'destructive_edit': ('bk_destructiveEdit', 0),  # edit modu islemleri gecmis birakmasin (Blender gibi)
@@ -39,6 +41,19 @@ def setting(name):
     return cmds.optionVar(q=var)
 
 
+def cached_setting(name):
+    """Her tus / kare olayinda okunan ayarlar icin (emulate_numpad, overlay ...): optionVar bir kez okunur,
+    set_setting degeri degistirince onbellek silinir."""
+    cache = _state.get('setting_cache')
+    if cache is None:
+        cache = _state['setting_cache'] = {}
+    try:
+        return cache[name]
+    except KeyError:
+        value = cache[name] = setting(name)
+        return value
+
+
 def set_setting(name, value):
     from .mayaprefs import _apply_camera_settings  # dongusel import: cagri aninda
     var, _ = SETTINGS[name]
@@ -46,6 +61,7 @@ def set_setting(name, value):
         cmds.optionVar(stringValue=(var, value))
     else:
         cmds.optionVar(intValue=(var, int(value)))
+    (_state.get('setting_cache') or {}).pop(name, None)
     if name in ('zoom_to_mouse', 'orbit_selection'):
         _apply_camera_settings()
     if name == 'language':

@@ -8,6 +8,7 @@ from __future__ import absolute_import, division, print_function
 
 import io
 import os
+import re
 import sys
 import tempfile
 
@@ -105,6 +106,28 @@ def _kbd(label):
     return '+'.join('<kbd>%s</kbd>' % _esc(part) for part in label.split('+')) if label != '+' else '<kbd>+</kbd>'
 
 
+def _help_summary(title):
+    """F1 yardimindaki (secili dilde) '<b>title</b>' satirinin aciklamasi; yoksa ''."""
+    from . import i18n, helptext   # dongusel import: cagri aninda
+    text = i18n.HELP_EN if _lang() == 'en' and i18n.HELP_EN else helptext.HELP
+    match = re.search(r'<tr><td><b>%s</b></td><td>(.*?)</td></tr>' % re.escape(_t(title)), text, re.S)
+    return match.group(1).strip() if match else ''
+
+
+def _context_section(title, table):
+    """Baglam tablosu (sculpt / UV / Graph): girdilerin basligi varsa (tus, baslik) satirlari; yoksa F1
+    yardimindaki tek satirlik ozet (yalin tus listesi anlamsiz)."""
+    titled = [(combo, binding.get('title')) for combo, binding in sorted(table.items()) if binding.get('title')]
+    if titled:
+        return '<table>%s</table>' % '\n'.join(
+            '<tr><td class="k">%s</td><td>%s</td></tr>' % (_kbd(_combo_label(combo)), _esc(_t(name)))
+            for combo, name in titled)
+    summary = _help_summary(title)
+    if summary:
+        return '<p>%s</p>' % summary          # yardim metni zaten HTML (kacirilmaz)
+    return '<p>%s</p>' % ' '.join(_kbd(_combo_label(combo)) for combo in sorted(table))
+
+
 def html():
     from . import __version__, TAGLINE   # dongusel import: cagri aninda
     sections = []
@@ -116,13 +139,12 @@ def html():
         body = '\n'.join('<tr><td class="k">%s</td><td>%s</td></tr>' % (_kbd(k), _esc(t)) for k, t in items)
         sections.append('<section><h2>%s</h2><table>%s</table></section>' % (_esc(_t(title)), body))
     extra = [
-        (_t('Sculpt modu'), sorted(k for k in SCULPT_KEYMAP)),
-        (_t('UV editörü'), sorted(CONTEXT_KEYMAPS['uv'])),
-        (_t('Graph Editor / Dope Sheet'), sorted(CONTEXT_KEYMAPS['graph'])),
+        ('Sculpt modu', SCULPT_KEYMAP),
+        ('UV editörü', CONTEXT_KEYMAPS['uv']),
+        ('Graph Editor / Dope Sheet', CONTEXT_KEYMAPS['graph']),
     ]
-    for title, combos in extra:
-        sections.append('<section><h2>%s</h2><p>%s</p></section>' % (
-            _esc(title), ' '.join(_kbd(_combo_label(c)) for c in combos)))
+    for title, table in extra:
+        sections.append('<section><h2>%s</h2>%s</section>' % (_esc(_t(title)), _context_section(title, table)))
     return ('<!doctype html><html lang="%s"><head><meta charset="utf-8">'
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             '<title>Orange %s</title><style>%s</style></head><body>'
