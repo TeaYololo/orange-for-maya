@@ -6,6 +6,7 @@ eksik anahtar Turkce gorunur (hata vermez). HELP_EN: F1 yardimi.
 """
 
 EN = {
+    'Kısayollarda ara...': 'Search shortcuts...',
     'Yeni sürümleri otomatik denetle': 'Automatically check for updates',
     'Güncellemeleri denetle...': 'Check for updates...',
     'Orange için yeni bir sürüm bulundu: %s (kurulu sürüm: %s).': 'A new version of Orange is available: %s (installed: %s).',

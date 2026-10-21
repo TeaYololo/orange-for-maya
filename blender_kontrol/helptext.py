@@ -2,6 +2,9 @@
 """F1 kisayol listesi."""
 from __future__ import absolute_import, division, print_function
 
+import html
+import re
+
 from .compat import QtWidgets, _main_window
 from . import i18n
 from .i18n import _lang, _t
@@ -152,8 +155,24 @@ def show_help():
     dlg.setWindowTitle(_t('Orange kısayolları'))
     dlg.resize(620, 760)
     layout = QtWidgets.QVBoxLayout(dlg)
+    search = QtWidgets.QLineEdit()
+    search.setPlaceholderText(_t('Kısayollarda ara...'))
+    layout.addWidget(search)
     text = QtWidgets.QTextBrowser()
-    text.setHtml((i18n.HELP_EN if _lang() == 'en' and i18n.HELP_EN else HELP).replace('<table>', '<table cellpadding="3">'))
+    source = (i18n.HELP_EN if _lang() == 'en' and i18n.HELP_EN else HELP).replace('<table>', '<table cellpadding="3">')
+
+    def filter_help(query):
+        words = [word.casefold() for word in query.split() if word]
+
+        def keep_row(match):
+            row = match.group(0)
+            plain = html.unescape(re.sub(r'<[^>]*>', ' ', row)).casefold()
+            return row if all(word in plain for word in words) else ''
+        text.setHtml(re.sub(r'<tr\b[^>]*>.*?</tr>', keep_row, source, flags=re.I | re.S))
+
+    search.textChanged.connect(filter_help)
+    filter_help('')
     layout.addWidget(text)
     dlg.show()
+    search.setFocus()
     return dlg

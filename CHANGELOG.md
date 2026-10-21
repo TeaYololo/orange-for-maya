@@ -1,5 +1,10 @@
 # Değişiklikler
 
+## 1.0.1 — 2026-10-21
+
+- **F3 komut araması:** macOS'ta Maya'nın yanıt vermemesine yol açabilen popup pencere, normal araç penceresi olarak açılır. Maya menü komutları pencere göründükten sonra küçük gruplar halinde yüklenir.
+- **F1 kısayol listesi:** Kısayolları açıklama ve tuş adına göre anında süzen arama alanı eklendi.
+
 ## 1.0.0 — 2026-10-12 (ilk kararlı sürüm: güncelleme denetimi, modifier paneli, performans)
 
 - **Güncelleme denetimi:** Maya açılışında GitHub Releases sürümü arka planda kontrol edilir; yeni sürümde indir, sonra kur, yalnızca o sürümü atla, otomatik soruları kapat veya sürüm notlarını aç. Otomatik denetim Orange menüsünden yeniden açılabilir. İndirme onaylandıktan sonra kurulum sonraki Maya açılışında yapılır.
