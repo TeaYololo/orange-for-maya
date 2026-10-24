@@ -1322,6 +1322,9 @@ def test_perf_fixes():
         gfn, gdag = bk._mesh_fn(gp)
         bk._mesh_graph(gfn, gdag.fullPathName())
         cmds.polyExtrudeFacet(gp + '.f[0]', localTranslateZ=0.2)
+        # Topoloji degisti: eski MFnMesh'i kullanmak Maya'yi cokertebiliyor (PolyEngine); uygulama da her islemde
+        # yeni MFnMesh alir.
+        gfn, gdag = bk._mesh_fn(gp)
         bk._mesh_graph(gfn, gdag.fullPathName())
         ok('mesh grafigi: yol basina tek kayit', len(bk.picking._graph_cache) == 1, len(bk.picking._graph_cache))
         MOD._abort_modal()
