@@ -6,7 +6,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.api.OpenMaya as om
 
-from .compat import CTRL_KEY, CTRL, EV_KEY_PRESS, QtCore, QtGui, QtWidgets, wrapInstance
+from .compat import CTRL_KEY, EV_KEY_PRESS, QtCore, QtGui, QtWidgets, wrapInstance
 from .core import _current_filter_set_modal, _msg, _tip, _warn
 from .i18n import _t
 from .keys import _phys

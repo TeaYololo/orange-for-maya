@@ -8,7 +8,7 @@ import json
 import maya.cmds as cmds
 import maya.mel as mel
 
-from .compat import CTRL_KEY, CTRL, EV_KEY_PRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
+from .compat import CTRL_KEY, EV_KEY_PRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
 from .core import _msg, _search_cache
 from .settings import set_setting, setting
 from .i18n import _t

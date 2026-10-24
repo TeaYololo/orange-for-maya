@@ -8,7 +8,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui2
 
-from .compat import (CTRL_KEY, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
+from .compat import (CTRL_KEY, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
     SHIFT, wrapInstance)
 from .core import _current_filter_set_modal, _tip, _warn, run_after_op
 from .i18n import _t

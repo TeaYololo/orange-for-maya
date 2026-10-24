@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-from .compat import CTRL_KEY, wheel_steps, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, EV_WHEEL, LMB, Qt, QtCore, QtGui, RMB
+from .compat import CTRL_KEY, wheel_steps, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, EV_WHEEL, LMB, Qt, QtCore, QtGui, RMB
 from .core import _current_filter_set_modal, _msg, _warn, run_after_op
 from .i18n import _t
 from .util import _comp, _last_view_panel, _mesh_fn, _objs, _set_world_points, _shape_type

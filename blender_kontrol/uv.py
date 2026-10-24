@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 import maya.cmds as cmds
 import maya.mel as mel
 
-from .compat import (CTRL_KEY, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
+from .compat import (CTRL_KEY, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
     SHIFT, _main_window, wrapInstance)
 from .core import _current_filter_set_modal, _msg, _tip, _warn
 from .i18n import _t
