@@ -210,16 +210,165 @@ def knife():
     mel.eval('MultiCutTool')
 
 
+def _comp_index(name):
+    return int(name.rsplit('[', 1)[1].rstrip(']'))
+
+
+def _boundary_neighbors(dag, vid):
+    """vid kosesinin sinir (tek yuzlu) kenarlarla bagli komsulari."""
+    vit = om.MItMeshVertex(dag)
+    vit.setIndex(vid)
+    eit = om.MItMeshEdge(dag)
+    out = []
+    for e in vit.getConnectedEdges():
+        eit.setIndex(e)
+        if eit.onBoundary():
+            a, b = eit.vertexId(0), eit.vertexId(1)
+            out.append(b if a == vid else a)
+    return out
+
+
+def corner_fill_plan(v, a, b, step, dist):
+    """Blender F (tek sinir kosesi): kosedeki iki sinir kenarindan bir yuz.
+
+    v: secili kose; a, b: sinir komsulari. step(prev, cur): sinirda cur'dan sonraki kose (prev'in tersi).
+    dist(p, q): iki kose arasi uzaklik. Donus: (dongu, sonraki_kose) ya da None.
+    dongu sinir yonunde siralidir (b -> v -> a ...); delik kapandiysa sonraki_kose None.
+    Delik ucgen / dortgense tamamen kapanir; daha buyukse kisa yeni kenarli dortgen secilir ve yeni kenarin
+    a tarafindaki ucu secili kalir: F'ye tekrar basmak deligi yuz yuz doldurur."""
+    a2, b2 = step(v, a), step(v, b)
+    if a2 is None or b2 is None:
+        return None
+    if a2 == b:                       # ucgen delik
+        return [b, v, a], None
+    if a2 == b2:                      # dortgen delik
+        return [b, v, a, a2], None
+    if dist(a2, b) <= dist(a, b2):
+        return [b, v, a, a2], a2      # yeni kenar a2-b
+    return [b2, b, v, a], a           # yeni kenar a-b2
+
+
+def _oriented(fn, dag, cycle):
+    """Yeni yuzun sarimi komsu yuzle tutarli olsun: dongudeki ilk sinir kenari (p, q) komsu yuzde p->q
+    yonundeyse yeni yuz q->p gitmeli (ters cevir)."""
+    p, q = cycle[0], cycle[1]
+    vit = om.MItMeshVertex(dag)
+    vit.setIndex(p)
+    eit = om.MItMeshEdge(dag)
+    for e in vit.getConnectedEdges():
+        eit.setIndex(e)
+        if {eit.vertexId(0), eit.vertexId(1)} != {p, q}:
+            continue
+        faces = eit.getConnectedFaces()
+        if len(faces) != 1:
+            break
+        verts = list(fn.getPolygonVertices(faces[0]))
+        i = verts.index(p)
+        if verts[(i + 1) % len(verts)] == q:
+            return list(reversed(cycle))
+        break
+    return list(cycle)
+
+
+def _append_face(obj, cycle):
+    """Var olan koselerden yeni yuz (yeni kenarlar kendiliginden olusur); donus: yeni yuzun adi."""
+    fn, dag = _mesh_fn(obj)
+    cycle = _oriented(fn, dag, cycle)
+    before = cmds.polyEvaluate(obj, face=True)
+    cmds.polyAppendVertex(obj, append=cycle)
+    return '%s.f[%d]' % (obj, before)
+
+
+def fill_corner(vertex):
+    """Tek sinir kosesi + F: kosedeki deligi bir yuzle doldur, sonraki koseyi sec (F tekrar = sonraki yuz)."""
+    obj = vertex.split('.')[0]
+    fn, dag = _mesh_fn(obj)
+    v = _comp_index(vertex)
+    nbrs = _boundary_neighbors(dag, v)
+    if len(nbrs) != 2:
+        _msg(_t('Tek köşeyle doldurmak için deliğin kenarında bir köşe seç'))
+        return None
+
+    def step(prev, cur):
+        nxt = [n for n in _boundary_neighbors(dag, cur) if n != prev]
+        return nxt[0] if len(nxt) == 1 else None
+
+    points = fn.getPoints()
+
+    def dist(p, q):
+        return (points[p] - points[q]).length()
+
+    plan = corner_fill_plan(v, nbrs[0], nbrs[1], step, dist)
+    if plan is None:
+        _msg(_t('Bu delik tek köşeyle doldurulamıyor (dallanan sınır)'))
+        return None
+    cycle, nxt = plan
+    face = _append_face(obj, cycle)
+    if nxt is not None:
+        cmds.select('%s.vtx[%d]' % (obj, nxt), replace=True)
+    else:
+        cmds.select(clear=True)
+    return face
+
+
+def edge_chain(edges):
+    """[(v0, v1), ...] kenarlarindan tek, dallanmayan zincir: (siralı koseler, kapali_mi) ya da None."""
+    adj = {}
+    for p, q in edges:
+        adj.setdefault(p, []).append(q)
+        adj.setdefault(q, []).append(p)
+    if not adj or any(len(n) > 2 for n in adj.values()):
+        return None
+    ends = [p for p, n in adj.items() if len(n) == 1]
+    closed = not ends
+    if len(ends) not in (0, 2):
+        return None
+    start = ends[0] if ends else edges[0][0]
+    order, prev = [start], None
+    while True:
+        nxt = [n for n in adj[order[-1]] if n != prev]
+        if not nxt or (closed and nxt[0] == start):
+            break
+        prev = order[-1]
+        order.append(nxt[0])
+    if len(order) != len(adj):
+        return None                    # birden fazla parca
+    return order, closed
+
+
+def _fill_edges(edges):
+    """Kenarlarla F: tek acik sinir zinciri -> o koselerden tek yuz (Blender gibi); kapali halka -> delik
+    kapanir; ayri kenarlar -> kopru."""
+    objs = {e.split('.')[0] for e in edges}
+    if len(objs) == 1:
+        obj = objs.pop()
+        flat = cmds.ls(edges, flatten=True) or []
+        fn, dag = _mesh_fn(obj)
+        eit = om.MItMeshEdge(dag)
+        pairs, boundary = [], True
+        for e in flat:
+            eit.setIndex(_comp_index(e))
+            boundary = boundary and eit.onBoundary()
+            pairs.append((eit.vertexId(0), eit.vertexId(1)))
+        chain = edge_chain(pairs) if boundary and len(pairs) >= 2 else None
+        if chain is not None and not chain[1] and len(chain[0]) >= 3:
+            cmds.select(_append_face(obj, chain[0]), replace=True)
+            return
+    try:
+        cmds.polyBridgeEdge(edges, divisions=0)
+    except Exception:
+        cmds.polyCloseBorder(edges)
+
+
 def fill():
     if _comps('edge'):
-        try:
-            cmds.polyBridgeEdge(_comps('edge'), divisions=0)
-        except Exception:
-            cmds.polyCloseBorder(_comps('edge'))
+        _fill_edges(_comps('edge'))
         return
     verts = cmds.ls(orderedSelection=True, flatten=True) or []
     verts = [v for v in verts if '.vtx[' in v]
-    if len(verts) == 2:
+    if len(verts) == 1:
+        fill_corner(verts[0])
+    elif len(verts) == 2:
         cmds.polyConnectComponents(verts)
     elif len(verts) >= 3:
         obj = verts[0].split('.')[0]

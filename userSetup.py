@@ -10,7 +10,7 @@ import maya.utils
 def _orange_startup():
     try:
         import blender_kontrol
-        blender_kontrol.install()
+        blender_kontrol.startup()
     except Exception as exc:
         print("[Orange] yuklenemedi / could not start: %s" % exc)
 

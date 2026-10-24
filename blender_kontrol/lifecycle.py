@@ -3,12 +3,15 @@
 from __future__ import absolute_import, division, print_function
 
 import functools
+import io
+import json
+import os
 import sys
 
 import maya.cmds as cmds
 
 from .compat import QtCore, QtWidgets
-from .core import _JOB_KEY, _KEY, _filter, _msg, _warn
+from .core import _JOB_KEY, _KEY, _filter, _msg, _state, _warn
 from .settings import set_setting, setting
 from .i18n import _t
 from .ui import _hint_bar, shutdown_overlay, shutdown_ui
@@ -40,9 +43,115 @@ def is_installed():
     return _filter() is not None
 
 
+# ---------------------------------------------------------------- acilis korumasi (#4)
+# Orange baslarken her adimi diske yazar; baslatma bitip Maya bir sure sorunsuz calisinca (ya da Maya duzgun
+# kapaninca) dosya silinir. Maya acilirken dosya hala oradaysa onceki baslatma Maya'yi cokertmistir: Orange bu
+# acilista kendiliginden baslamaz (Maya her acilista cokup kilitli kalmasin); menude adim ve "Simdi baslat" gorunur.
+STARTUP_MARKER = 'orange_startup.json'
+STARTUP_BLOCK_VAR = 'bk_startupBlocked'     # optionVar: yarida kalan adim ('' = engel yok)
+STARTUP_SETTLE_MS = 20000                   # acilis guncelleme denetimi (7 sn + 6 sn zaman asimi) de bu surede biter
+
+
+def _marker_path():
+    return os.path.join(cmds.internalVar(userAppDir=True), STARTUP_MARKER)
+
+
+def _read_marker():
+    try:
+        with io.open(_marker_path(), encoding='utf-8') as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def startup_stage(stage):
+    """Baslatmanin vardigi adimi yaz (Maya coker ise kaybolmasin diye diske hemen yazilir)."""
+    if _state.get('startup_settled', True):
+        return
+    from . import __version__   # dongusel import: cagri aninda
+    try:
+        with io.open(_marker_path(), 'w', encoding='utf-8') as fh:
+            fh.write(json.dumps({'stage': stage, 'pid': os.getpid(), 'version': __version__}))
+            fh.flush()
+            os.fsync(fh.fileno())
+    except Exception:
+        pass
+
+
+def clear_startup_marker(*_):
+    _state['startup_settled'] = True
+    try:
+        os.remove(_marker_path())
+    except OSError:
+        pass
+
+
+def startup_blocked():
+    """Onceki baslatma yarida kaldiysa o adimin adi, yoksa ''."""
+    try:
+        if cmds.optionVar(exists=STARTUP_BLOCK_VAR):
+            return cmds.optionVar(q=STARTUP_BLOCK_VAR) or ''
+    except Exception:
+        pass
+    return ''
+
+
+def _unblock():
+    try:
+        cmds.optionVar(remove=STARTUP_BLOCK_VAR)
+    except Exception:
+        pass
+
+
+def _watch_startup():
+    """Baslatma isaretini tut; sure dolunca ve Maya kapanirken sil."""
+    _state['startup_settled'] = False
+    app = QtWidgets.QApplication.instance()
+    if app is not None and not _state.get('quit_hooked'):
+        try:
+            app.aboutToQuit.connect(clear_startup_marker)
+            _state['quit_hooked'] = True
+        except Exception:
+            pass
+    QtCore.QTimer.singleShot(STARTUP_SETTLE_MS, clear_startup_marker)
+
+
+def startup():
+    """Maya acilisinda (modulun userSetup.py'si) cagrilir. Onceki baslatma Maya'yi cokerttiyse Orange'i
+    baslatma, menude bildir. Donus: True = Orange basladi."""
+    previous = _read_marker()
+    if previous and previous.get('pid') != os.getpid():
+        cmds.optionVar(stringValue=(STARTUP_BLOCK_VAR, str(previous.get('stage') or '?')))
+        clear_startup_marker()
+    stage = startup_blocked()
+    if stage:
+        print('[Orange] ' + _t('Önceki açılışta Orange başlarken Maya kapandı (adım: %s). Orange bu açılışta '
+                               'başlatılmadı; başlatmak için Orange menüsü > Şimdi başlat.') % stage)
+        _build_menu()
+        try:
+            cmds.inViewMessage(assistMessage=_t('Orange başlatılmadı: önceki açılış yarıda kaldı (Orange menüsü)'),
+                               position='topCenter', fade=True, fadeStayTime=6000)
+        except Exception:
+            pass
+        return False
+    install()
+    update.schedule_startup_check()
+    return True
+
+
+def start_now(*_):
+    """Engellenen acilistan sonra elle baslat (menu)."""
+    _unblock()
+    cmds.evalDeferred(install)
+
+
 def install(quiet=False):
+    _unblock()              # elle ya da acilista baslatildi: engel kalkar (yine cokerse isaret yeniden yakalar)
+    _watch_startup()
+    startup_stage('install')
     uninstall(quiet=True)
     app = QtWidgets.QApplication.instance()
+    startup_stage('event filter')
     filt = BlenderFilter(app)
     app.installEventFilter(filt)
     setattr(sys.modules['__main__'], _KEY, filt)
@@ -59,11 +168,13 @@ def install(quiet=False):
 
 
 def _install_rest(app, filt, quiet):
+    startup_stage('maya settings')
     _save_maya_defaults()
     try:
         cmds.selectPref(trackSelectionOrder=True)
     except Exception:
         pass
+    startup_stage('script jobs')
     _kill_old_cursor_job()
     jobs = []
     for event in ('PreFileNewOrOpened', 'SceneOpened', 'NewSceneOpened'):
@@ -83,10 +194,12 @@ def _install_rest(app, filt, quiet):
     if cmds.objExists(CURSOR):
         _style_cursor(CURSOR)
     _apply_camera_settings()
+    startup_stage('hotkey editor commands')
     try:
         hotkeys.register()
     except Exception as exc:
         _warn('Hotkey Editor: %s' % exc)
+    startup_stage('menu')
     _build_menu()
     # Maya acilista ve sonra (yeni paneller acilinca) kendi uygulama filtrelerini kuruyor; en son kurulan filtre
     # once cagrildigi icin bazi tuslari (Tab; Maya kisayolu olan Ctrl+R gibi) bizden once yutabiliyor.
@@ -96,6 +209,7 @@ def _install_rest(app, filt, quiet):
     filt.keep_on_top = QtCore.QTimer(filt)
     filt.keep_on_top.timeout.connect(functools.partial(_raise_filter, filt))
     filt.keep_on_top.start(RAISE_INTERVAL_MS)
+    startup_stage('running')
     if not quiet:
         _msg(_t('Orange AÇIK: Blender tuşları etkin  -  F1: kısayol listesi'))
 
@@ -242,6 +356,12 @@ def _build_menu():
     if cmds.menu(name, exists=True):
         cmds.deleteUI(name)
     menu = cmds.menu(name, label='Orange', parent='MayaWindow', tearOff=True)
+    blocked = startup_blocked()
+    if blocked and not is_installed():
+        cmds.menuItem(label=_t('Orange başlatılmadı: önceki açılış yarıda kaldı (adım: %s)') % blocked,
+                      enable=False, parent=menu)
+        cmds.menuItem(label=_t('Şimdi başlat'), boldFont=True, parent=menu, command=start_now)
+        cmds.menuItem(divider=True, parent=menu)
     available = getattr(update, 'available_release', None)
     if available:
         # Acilis denetimi yeni surum buldu: pencere ancak buradan (istenince) acilir

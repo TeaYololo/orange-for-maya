@@ -48,9 +48,19 @@ def diagnostics_text():
         'Installed: %s, key replays: %s' % (filt is not None, getattr(filt, 'replays', '-')),
         'Package: %s' % os.path.dirname(os.path.abspath(__file__)).replace('\\', '/'),
         'Custom shortcuts: %d' % len(_state.get('overrides') or {}),
+        'Startup guard: %s' % (_startup_guard() or 'ok'),
         'Settings: ' + ', '.join('%s=%s' % (k, setting(k)) for k in sorted(SETTINGS) if k != 'favorites'),
     ]
     return '\n'.join(lines)
+
+
+def _startup_guard():
+    try:
+        from .lifecycle import startup_blocked   # dongusel import: cagri aninda
+        stage = startup_blocked()
+        return 'previous start stopped at "%s"' % stage if stage else ''
+    except Exception:
+        return '?'
 
 
 def report_issue():

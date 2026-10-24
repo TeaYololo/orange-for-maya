@@ -167,6 +167,105 @@ def test_mesh_ops():
     cmds.delete('hoCube')
 
 
+def test_fill_corner():
+    """F (Blender): tek sinir kosesi deligi yuz yuz doldurur; acik kenar zinciri tek yuz olur."""
+    p = cmds.polyPlane(name='hfPlane', sx=4, sy=3, w=4, h=3)[0]
+    normals_before = cmds.polyInfo(p + '.f[0]', faceNormals=True)[0]
+    cmds.delete(p + '.f[5]', p + '.f[6]')          # orta sirada 2 dortgenlik delik (6 sinir kosesi)
+    corner = [v for v in cmds.ls(p + '.vtx[*]', flatten=True)
+              if len(bk.mesh._boundary_neighbors(bk.mesh._mesh_fn(p)[1], bk.mesh._comp_index(v))) == 2
+              and len(cmds.ls(cmds.polyListComponentConversion(v, toFace=True), flatten=True)) == 3]
+    ok('delik kosesi bulundu', corner, corner)
+    cmds.select(corner[0])
+    bk.fill()
+    ok('F tek kose: bir dortgen', cmds.polyEvaluate(p, face=True) == 11, cmds.polyEvaluate(p, face=True))
+    nxt = cmds.ls(sl=True, flatten=True)
+    ok('F tek kose: sonraki kose secili', len(nxt) == 1 and '.vtx[' in nxt[0], nxt)
+    bk.fill()
+    ok('F ikinci kez: delik kapandi', cmds.polyEvaluate(p, face=True) == 12, cmds.polyEvaluate(p, face=True))
+    sides = [len(cmds.ls(cmds.polyListComponentConversion('%s.f[%d]' % (p, i), toVertex=True), flatten=True))
+             for i in range(12)]
+    ok('F tek kose: n-gon yok', set(sides) == {4}, sides)
+    ref = [float(x) for x in normals_before.split(':')[1].split()]
+    up = all(sum(a * b for a, b in zip(ref, [float(x) for x in line.split(':')[1].split()])) > 0.9
+             for line in cmds.polyInfo(p + '.f[*]', faceNormals=True))
+    ok('F tek kose: normaller tutarli', up)
+    cmds.delete(p)
+    q = cmds.polyPlane(name='hfPlane2', sx=3, sy=3, w=3, h=3)[0]
+    cmds.delete(q + '.f[4]')                          # tek dortgen delik
+    fn, dag = bk.mesh._mesh_fn(q)
+    edges = [e for e in cmds.ls(q + '.e[*]', flatten=True)
+             if len(cmds.ls(cmds.polyListComponentConversion(e, toFace=True), flatten=True)) == 1
+             and cmds.polyListComponentConversion(e, toVertex=True)]
+    inner = [e for e in edges if all(abs(c) < 1.4 for v in cmds.ls(cmds.polyListComponentConversion(e, toVertex=True), flatten=True)
+                                     for c in cmds.xform(v, q=True, ws=True, t=True)[::2])]
+    pair = None
+    for i, e1 in enumerate(inner):
+        for e2 in inner[i + 1:]:
+            v1 = set(cmds.ls(cmds.polyListComponentConversion(e1, toVertex=True), flatten=True))
+            v2 = set(cmds.ls(cmds.polyListComponentConversion(e2, toVertex=True), flatten=True))
+            if v1 & v2:
+                pair = [e1, e2]
+                break
+        if pair:
+            break
+    ok('bitisik iki sinir kenari', pair, inner)
+    cmds.select(pair)
+    bk.fill()
+    ok('F iki kenar: ucgen', cmds.polyEvaluate(q, face=True) == 9 and
+       len(cmds.ls(cmds.polyListComponentConversion(cmds.ls(sl=True)[0], toVertex=True), flatten=True)) == 3,
+       (cmds.polyEvaluate(q, face=True), cmds.ls(sl=True)))
+    cmds.delete(q)
+
+
+def test_startup_guard():
+    """#4: onceki baslatma yarida kaldiysa (Maya coktu) Orange acilista baslamaz, adim menude / tanilamada gorunur."""
+    lc = bk.lifecycle
+    marker = lc._marker_path()
+    try:
+        lc._state['startup_settled'] = True
+        lc.startup_stage('menu')
+        ok('yerlesik durumda isaret yazilmaz', not os.path.exists(marker))
+        lc._state['startup_settled'] = False
+        lc.startup_stage('hotkey editor commands')
+        ok('baslarken adim diske yazilir', (lc._read_marker() or {}).get('stage') == 'hotkey editor commands',
+           lc._read_marker())
+        lc.clear_startup_marker()
+        ok('bitince isaret silinir', not os.path.exists(marker))
+        # baska bir surecin (coken Maya'nin) biraktigi isaret
+        io.open(marker, 'w', encoding='utf-8').write(u'{"stage": "event filter", "pid": -1, "version": "1.0.1"}')
+        started = lc.startup()
+        ok('cokme sonrasi acilista Orange baslamaz', started is False)
+        ok('yarida kalan adim saklanir', lc.startup_blocked() == 'event filter', lc.startup_blocked())
+        ok('eski isaret temizlenir', not os.path.exists(marker))
+        ok('tanilamada adim', 'event filter' in bk.diagnostics.diagnostics_text())
+        ok('ikinci acilista da bekler', lc.startup() is False)
+        lc._unblock()
+        ok('elle baslatinca engel kalkar', lc.startup_blocked() == '')
+    finally:
+        lc._unblock()
+        lc.clear_startup_marker()
+
+
+def test_update_proxies():
+    """#4: is parcacigi sistem proxy sorgusu yapmaz; proxy'ler ana is parcaciginda okunur ve acıcıya verilir."""
+    import urllib.request
+    calls = []
+    real = urllib.request.getproxies
+    urllib.request.getproxies = lambda: calls.append(1) or {'https': 'http://proxy.test:8080'}
+    try:
+        proxies = bk.update._main_thread_proxies()
+        opener = bk.update._opener(proxies)
+        handlers = [h for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler)]
+        ok('proxy ana is parcaciginda okunur', calls == [1] and proxies == {'https': 'http://proxy.test:8080'})
+        ok('acici verilen proxy ile kurulur', handlers and handlers[0].proxies == proxies)
+        n = len(calls)
+        bk.update._opener({})
+        ok('acici kurarken sistem sorgusu yok', len(calls) == n)
+    finally:
+        urllib.request.getproxies = real
+
+
 def test_keymap_and_settings():
     tmp = tempfile.mkdtemp(prefix='bk_keymap_')
     km = sys.modules['blender_kontrol.keymap']
@@ -200,7 +299,7 @@ def test_installer():
         ok('modul: paket', all(os.path.isfile(os.path.join(scripts, 'blender_kontrol', f))
                                for f in ('__init__.py', 'i18n_en.py', 'installer.py', 'keymap.py', 'orangeArray.py')))
         ok('modul: __pycache__ yok', not os.path.exists(os.path.join(scripts, 'blender_kontrol', '__pycache__')))
-        ok('modul: userSetup.py baslatir', 'blender_kontrol.install()' in io.open(os.path.join(scripts, 'userSetup.py'),
+        ok('modul: userSetup.py baslatir', 'blender_kontrol.startup()' in io.open(os.path.join(scripts, 'userSetup.py'),
                                                                                encoding='utf-8').read())
         ok('modul: ikon', os.path.isfile(os.path.join(root, 'icons', 'orange.png')))
         ok('modul: Array Maya eklentisi', os.path.isfile(os.path.join(root, 'plug-ins', 'orangeArray.py')))
@@ -1328,7 +1427,7 @@ def test_vp2_overlay():
 
 
 def main():
-    for fn in (test_i18n, test_keys, test_parse, test_mesh_helpers, test_selection_ops, test_mesh_ops,
+    for fn in (test_i18n, test_keys, test_parse, test_mesh_helpers, test_selection_ops, test_mesh_ops, test_fill_corner, test_startup_guard, test_update_proxies,
                test_keymap_and_settings, test_grid_fill, test_modifiers, test_review_fixes, test_perf_fixes, test_modifier_fixes, test_update_fixes, test_blender_primitives,
                test_destructive_edit,
                test_fbx_roundtrip,

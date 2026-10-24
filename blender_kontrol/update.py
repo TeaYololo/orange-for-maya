@@ -78,6 +78,7 @@ class _UpdateBridge(QtCore.QObject):
     def _on_check_finished(self, result):
         global _checking, _force_wanted
         _checking = False
+        _startup_stage('update check done')
         if _force_wanted:
             result = dict(result, force=True)
         _force_wanted = False
@@ -147,8 +148,23 @@ def _request(url, accept=None):
     return urllib.request.Request(url, headers=headers)
 
 
-def _read_latest_release():
-    with urllib.request.urlopen(_request(RELEASES_API), timeout=6) as response:
+def _main_thread_proxies():
+    """Sistem proxy ayarlarini ana is parcaciginda oku. macOS'ta urllib bunu SystemConfiguration (_scproxy)
+    uzerinden sorar; bu sorgu Maya icinde arka plan is parcacigindan yapilinca Maya'yi cokertebiliyor (#4)."""
+    try:
+        return dict(urllib.request.getproxies())
+    except Exception as exc:
+        _log('proxy', exc)
+        return {}
+
+
+def _opener(proxies=None):
+    """Proxy'leri onceden verilmis acici: is parcacigi icinde sistem proxy sorgusu yapilmaz."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler(proxies or {}))
+
+
+def _read_latest_release(proxies=None):
+    with _opener(proxies).open(_request(RELEASES_API), timeout=6) as response:
         data = json.loads(response.read().decode('utf-8'))
     tag = data.get('tag_name', '')
     if _version_key(tag) is None:
@@ -192,6 +208,15 @@ def _friendly_error(exc):
     return str(exc)
 
 
+def _startup_stage(stage):
+    """Acilis korumasi: Maya bu adimda coker ise bir sonraki acilista hangi adim oldugu bilinsin."""
+    try:
+        from .lifecycle import startup_stage   # dongusel import: cagri aninda
+        startup_stage(stage)
+    except Exception:
+        pass
+
+
 def _log(label, exc):
     print('[Orange] update %s: %s: %s' % (label, type(exc).__name__, exc))
 
@@ -221,15 +246,17 @@ def check_for_updates(force=False):
     _checking = True
     _force_wanted = False
     bridge = _get_bridge()
-    thread = threading.Thread(target=_check_worker, args=(bool(force), bridge),
+    proxies = _main_thread_proxies()
+    _startup_stage('update check')
+    thread = threading.Thread(target=_check_worker, args=(bool(force), bridge, proxies),
                               name='OrangeUpdateCheck')
     thread.daemon = True
     thread.start()
 
 
-def _check_worker(force, bridge):
+def _check_worker(force, bridge, proxies=None):
     try:
-        release = _read_latest_release()
+        release = _read_latest_release(proxies)
         result = {'ok': True, 'force': force, 'release': release}
     except Exception as exc:
         result = {'ok': False, 'force': force, 'error': str(exc), 'exc': exc}
@@ -470,7 +497,8 @@ def _start_download(release):
     _progress.setAutoReset(False)
     _progress.canceled.connect(_cancel_download)
     _progress.show()
-    thread = threading.Thread(target=_download_worker, args=(release, modules_dir, staging_dir, bridge),
+    proxies = _main_thread_proxies()
+    thread = threading.Thread(target=_download_worker, args=(release, modules_dir, staging_dir, bridge, proxies),
                               name='OrangeUpdateDownload')
     thread.daemon = True
     thread.start()
@@ -550,11 +578,11 @@ def _write_pending_update(modules_dir, staging_dir, source_dir, version):
     os.replace(temporary, marker)
 
 
-def _download_worker(release, modules_dir, staging_dir, bridge):
+def _download_worker(release, modules_dir, staging_dir, bridge, proxies=None):
     try:
         archive_path = os.path.join(staging_dir, 'release.zip')
         request = _request(release['asset_url'], accept='application/octet-stream')
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with _opener(proxies).open(request, timeout=20) as response:
             length = response.headers.get('Content-Length')
             total = int(length) if length and length.isdigit() else 0
             if total > MAX_ARCHIVE_SIZE:

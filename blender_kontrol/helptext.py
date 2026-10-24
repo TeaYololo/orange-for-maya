@@ -97,7 +97,7 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>L</b> / Shift + L</td><td>İmlecin altındaki parçayı seç / çıkar</td></tr>
 <tr><td><b>H</b> / Shift + H / Alt + H</td><td>Seçili yüzleri gizle / diğerlerini gizle / göster</td></tr>
 <tr><td><b>K</b></td><td>Bıçak (Multi-Cut)</td></tr>
-<tr><td><b>F</b> / Alt + F / <b>J</b></td><td>Yüz / kenar doldur, üçgenleyerek doldur, köşeleri bağla</td></tr>
+<tr><td><b>F</b> / Alt + F / <b>J</b></td><td>Yüz / kenar doldur (deliğin kenarındaki tek köşe: yüz yüz doldurur, F tekrar = sonraki yüz), üçgenleyerek doldur, köşeleri bağla</td></tr>
 <tr><td><b>M</b></td><td>Birleştir (merkezde / imleçte / collapse / ilk-son seçilende / mesafeye göre)</td></tr>
 <tr><td><b>Alt + M</b></td><td>Ayır - Split (taşımadan; kenarlardan / köşelerden)</td></tr>
 <tr><td><b>P</b></td><td>Ayır (seçim / materyale göre / gevşek parçalar)</td></tr>

@@ -31,7 +31,7 @@ fonksiyon icinde import edilir):
 """
 from __future__ import absolute_import, division, print_function
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 PRODUCT = 'Orange'
 TAGLINE = 'Maya, the Blender way'
 
@@ -52,4 +52,4 @@ for _mod in MODULES:
             globals().setdefault(_name, _value)
 del _mod, _name, _value
 
-from .lifecycle import install, uninstall, is_installed, reload_module  # noqa: E402,F401
+from .lifecycle import install, uninstall, is_installed, reload_module, startup  # noqa: E402,F401

@@ -33,6 +33,45 @@ def _sources():
 
 
 # ---------------------------------------------------------------- mimari
+def test_corner_fill_plan():
+    """F tek kose (#5): delik halkasi 0..n-1; secili kose 0, komsular 1 ve n-1."""
+    from blender_kontrol import mesh
+
+    def ring(n, pos=None):
+        def step(prev, cur):
+            for nxt in ((cur + 1) % n, (cur - 1) % n):
+                if nxt != prev:
+                    return nxt
+        pos = pos or {i: (i, 0) for i in range(n)}
+
+        def dist(p, q):
+            return ((pos[p][0] - pos[q][0]) ** 2 + (pos[p][1] - pos[q][1]) ** 2) ** 0.5
+        return step, dist
+
+    step, dist = ring(3)
+    assert mesh.corner_fill_plan(0, 1, 2, step, dist) == ([2, 0, 1], None)
+    step, dist = ring(4)
+    assert mesh.corner_fill_plan(0, 1, 3, step, dist) == ([3, 0, 1, 2], None)
+    # 2 x 1 merdiven delik: ust 0-1-2, alt 5-4-3; kose 0, a = 1 (ust), b = 5 (alt)
+    pos = {0: (0, 1), 1: (1, 1), 2: (2, 1), 3: (2, 0), 4: (1, 0), 5: (0, 0)}
+    step, dist = ring(6, pos)
+    cycle, nxt = mesh.corner_fill_plan(0, 1, 5, step, dist)
+    assert cycle == [4, 5, 0, 1] and nxt == 1          # kisa basamak (1-4), kalan delik dortgen
+    # komsular tersine verilse de ayni basamak
+    cycle, nxt = mesh.corner_fill_plan(0, 5, 1, step, dist)
+    assert sorted(cycle) == [0, 1, 4, 5]
+    assert mesh.corner_fill_plan(0, 1, 5, lambda p, c: None, dist) is None
+
+
+def test_edge_chain():
+    from blender_kontrol import mesh
+    assert mesh.edge_chain([(1, 2), (2, 3)]) in (([1, 2, 3], False), ([3, 2, 1], False))
+    order, closed = mesh.edge_chain([(1, 2), (2, 3), (3, 1)])
+    assert closed and sorted(order) == [1, 2, 3]
+    assert mesh.edge_chain([(1, 2), (3, 4)]) is None              # iki parca: kopru
+    assert mesh.edge_chain([(1, 2), (1, 3), (1, 4)]) is None      # dallanma
+
+
 def test_version_and_product():
     assert re.match(r'^\d+\.\d+\.\d+$', bk.__version__)
     assert bk.PRODUCT == 'Orange'

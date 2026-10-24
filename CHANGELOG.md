@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## 1.0.2 — 2026-10-24
+
+- **Açılış koruması (macOS'ta Maya'nın her açılışta çökmesi, #4):** Orange başlarken vardığı adımı diske yazar. Maya bir önceki başlatmada çöktüyse Orange o açılışta kendiliğinden başlamaz; Maya açılır, Orange menüsünde yarıda kalan adım ve **Şimdi başlat** görünür. Adım, "Sorun bildir" tanılama metnine de eklenir.
+- **Güncelleme denetimi:** sistem proxy ayarları artık ana iş parçacığında okunur. macOS'ta urllib bu ayarı SystemConfiguration üzerinden soruyor; sorgu arka plan iş parçacığında yapılınca Maya çökebiliyordu.
+- **F ile tek tek yüz doldurma (#5):** deliğin kenarındaki tek bir köşe seçiliyken F, o köşeden bir yüz açar (Blender gibi): üçgen / dörtgen delik tamamen kapanır, büyük delikte daha kısa yeni kenarlı dörtgen seçilir ve sonraki köşe seçili kalır; F'ye tekrar basmak deliği n-gon oluşturmadan yüz yüz doldurur. Bitişik sınır kenarlarından oluşan açık bir zincirle F, yalnızca o köşelerden tek bir yüz yapar (önceden bütün delik tek n-gon ile kapanıyordu). Yeni yüzün yönü komşu yüzlerle tutarlıdır.
+
 ## 1.0.1 — 2026-10-21
 
 - **F3 komut araması:** macOS'ta Maya'nın yanıt vermemesine yol açabilen popup pencere, normal araç penceresi olarak açılır. Maya menü komutları pencere göründükten sonra küçük gruplar halinde yüklenir.

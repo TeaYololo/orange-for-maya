@@ -493,6 +493,12 @@ EN = {
     'Doldur ve üçgenle (Fill, Alt+F)': 'Fill with triangles (Alt+F)',
     'Doldurmak için kenar ya da köşe seç': 'Select edges or vertices to fill',
     'Doldurmak için sınır kenarları seç': 'Select boundary edges to fill',
+    'Önceki açılışta Orange başlarken Maya kapandı (adım: %s). Orange bu açılışta başlatılmadı; başlatmak için Orange menüsü > Şimdi başlat.': 'Maya closed while Orange was starting last time (step: %s). Orange was not started this time; to start it use Orange menu > Start now.',
+    'Orange başlatılmadı: önceki açılış yarıda kaldı (Orange menüsü)': 'Orange did not start: the previous start did not finish (see the Orange menu)',
+    'Orange başlatılmadı: önceki açılış yarıda kaldı (adım: %s)': 'Orange did not start: the previous start did not finish (step: %s)',
+    'Şimdi başlat': 'Start now',
+    'Tek köşeyle doldurmak için deliğin kenarında bir köşe seç': 'To fill from one vertex, select a vertex on the edge of a hole',
+    'Bu delik tek köşeyle doldurulamıyor (dallanan sınır)': 'This hole cannot be filled from one vertex (branching border)',
     'DÖNDÜR': 'ROTATE',
     'Döndür (Rotate)': 'Rotate',
     'Döndürme && Ölçek': 'Rotation && Scale',
@@ -1041,7 +1047,7 @@ wheel/PageUp proportional size · type a number or expression (e.g. 2*3), - nega
 <tr><td><b>L</b> / Shift + L</td><td>Select / deselect the part under the mouse</td></tr>
 <tr><td><b>H</b> / Shift + H / Alt + H</td><td>Hide selected / hide unselected / reveal</td></tr>
 <tr><td><b>K</b></td><td>Knife (Multi-Cut)</td></tr>
-<tr><td><b>F</b> / Alt + F / <b>J</b></td><td>New edge/face, fill with triangles, connect vertex path</td></tr>
+<tr><td><b>F</b> / Alt + F / <b>J</b></td><td>New edge/face (one vertex on a hole border: fills one face at a time, press F again for the next), fill with triangles, connect vertex path</td></tr>
 <tr><td><b>M</b></td><td>Merge (at center / at cursor / collapse / at first / at last / by distance)</td></tr>
 <tr><td><b>Alt + M</b></td><td>Split (without moving; by edges / by vertices)</td></tr>
 <tr><td><b>P</b></td><td>Separate (selection / by material / by loose parts)</td></tr>

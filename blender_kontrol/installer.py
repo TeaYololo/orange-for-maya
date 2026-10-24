@@ -46,9 +46,10 @@ def _orange_startup():
         if updated:
             # installer.start() yeni paketi zaten yukledi; bootstrap degiskenini de ona bagla.
             import blender_kontrol
+            blender_kontrol.update.schedule_startup_check()
         else:
-            blender_kontrol.install()
-        blender_kontrol.update.schedule_startup_check()
+            # Onceki baslatma Maya'yi cokerttiyse Orange bu acilista baslamaz (menude bildirir).
+            blender_kontrol.startup()
     except Exception as exc:
         print("[Orange] could not start: %s" % exc)
 
