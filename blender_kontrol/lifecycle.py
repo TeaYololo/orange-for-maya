@@ -119,6 +119,10 @@ def _watch_startup():
 def startup():
     """Maya acilisinda (modulun userSetup.py'si) cagrilir. Onceki baslatma Maya'yi cokerttiyse Orange'i
     baslatma, menude bildir. Donus: True = Orange basladi."""
+    _state['maya_started'] = True
+    if os.environ.get('ORANGE_DISABLE'):
+        print('[Orange] ORANGE_DISABLE: Orange bu acilista baslatilmadi / not started')
+        return False
     previous = _read_marker()
     if previous and previous.get('pid') != os.getpid():
         cmds.optionVar(stringValue=(STARTUP_BLOCK_VAR, str(previous.get('stage') or '?')))
@@ -146,6 +150,7 @@ def start_now(*_):
 
 
 def install(quiet=False):
+    _state['maya_started'] = True
     _unblock()              # elle ya da acilista baslatildi: engel kalkar (yine cokerse isaret yeniden yakalar)
     _watch_startup()
     startup_stage('install')

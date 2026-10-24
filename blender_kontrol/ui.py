@@ -353,8 +353,10 @@ class PieMenu(QtWidgets.QWidget):
         self.opened = QtCore.QElapsedTimer()
         self.opened.start()
         self.show()
-        self.activateWindow()
-        self.setFocus()
+        if sys.platform != 'darwin':
+            # Cocoa'da Qt.Popup tusu zaten alir; acik popup'i ayrica etkinlestirmek pencere sirasini bozabiliyor
+            self.activateWindow()
+            self.setFocus()
 
     def _pos(self, ev):
         return ev.position() if hasattr(ev, 'position') else QtCore.QPointF(ev.pos())

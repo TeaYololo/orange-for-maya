@@ -21,6 +21,7 @@ import socket
 import tempfile
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 import zipfile
 
@@ -148,19 +149,62 @@ def _request(url, accept=None):
     return urllib.request.Request(url, headers=headers)
 
 
+# Guncelleme isteklerinin gidebilecegi sunucular (API, surum sayfasi, indirme yonlendirmeleri)
+UPDATE_HOSTS = ('api.github.com', 'github.com', 'objects.githubusercontent.com',
+                'release-assets.githubusercontent.com', 'codeload.github.com')
+
+
 def _main_thread_proxies():
-    """Sistem proxy ayarlarini ana is parcaciginda oku. macOS'ta urllib bunu SystemConfiguration (_scproxy)
-    uzerinden sorar; bu sorgu Maya icinde arka plan is parcacigindan yapilinca Maya'yi cokertebiliyor (#4)."""
+    """Sistem proxy ayarlarini ve proxy'siz gidilecek sunuculari ana is parcaciginda oku: (proxies, bypass).
+    macOS'ta urllib ikisini de SystemConfiguration (_scproxy) uzerinden sorar; bu sorgu Maya icinde arka plan is
+    parcacigindan yapilinca Maya'yi cokertebiliyor (#4)."""
     try:
-        return dict(urllib.request.getproxies())
+        proxies = dict(urllib.request.getproxies())
     except Exception as exc:
         _log('proxy', exc)
-        return {}
+        return {}, {}
+    bypass = {}
+    if proxies:
+        for host in UPDATE_HOSTS:
+            try:
+                bypass[host] = bool(urllib.request.proxy_bypass(host))
+            except Exception:
+                bypass[host] = False
+    return proxies, bypass
 
 
-def _opener(proxies=None):
-    """Proxy'leri onceden verilmis acici: is parcacigi icinde sistem proxy sorgusu yapilmaz."""
-    return urllib.request.build_opener(urllib.request.ProxyHandler(proxies or {}))
+class _PresetProxyHandler(urllib.request.ProxyHandler):
+    """ProxyHandler, ama proxy_bypass karari onceden (ana is parcaciginda) verilmis: standart proxy_open her istekte
+    proxy_bypass(host) cagirir, o da macOS'ta is parcacigi icinden _scproxy'ye gider."""
+
+    def __init__(self, proxies, bypass):
+        self._bypass = dict(bypass or {})
+        urllib.request.ProxyHandler.__init__(self, proxies)
+
+    def proxy_open(self, req, proxy, type):
+        host = (req.host or '').rsplit(':', 1)[0].strip('[]').lower()
+        if self._bypass.get(host):
+            return None
+        orig_type = req.type
+        proxy_type, user, password, hostport = urllib.request._parse_proxy(proxy)
+        if proxy_type is None:
+            proxy_type = orig_type
+        if user and password:
+            import base64
+            creds = base64.b64encode(('%s:%s' % (urllib.parse.unquote(user),
+                                                 urllib.parse.unquote(password))).encode()).decode('ascii')
+            req.add_header('Proxy-authorization', 'Basic ' + creds)
+        req.set_proxy(urllib.parse.unquote(hostport), proxy_type)
+        if orig_type == proxy_type or orig_type == 'https':
+            return None
+        return self.parent.open(req, timeout=req.timeout)
+
+
+def _opener(config=None):
+    """Proxy ayari onceden verilmis acici: is parcacigi icinde sistem proxy sorgusu yapilmaz.
+    config: _main_thread_proxies() sonucu (proxies, bypass) ya da None (proxy yok)."""
+    proxies, bypass = config if isinstance(config, tuple) else (config or {}, {})
+    return urllib.request.build_opener(_PresetProxyHandler(proxies, bypass))
 
 
 def _read_latest_release(proxies=None):

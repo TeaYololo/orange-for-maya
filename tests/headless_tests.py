@@ -251,19 +251,24 @@ def test_update_proxies():
     """#4: is parcacigi sistem proxy sorgusu yapmaz; proxy'ler ana is parcaciginda okunur ve acıcıya verilir."""
     import urllib.request
     calls = []
-    real = urllib.request.getproxies
+    real, real_bypass = urllib.request.getproxies, urllib.request.proxy_bypass
     urllib.request.getproxies = lambda: calls.append(1) or {'https': 'http://proxy.test:8080'}
+    urllib.request.proxy_bypass = lambda host: calls.append(host) or host == 'api.github.com'
     try:
-        proxies = bk.update._main_thread_proxies()
-        opener = bk.update._opener(proxies)
-        handlers = [h for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler)]
-        ok('proxy ana is parcaciginda okunur', calls == [1] and proxies == {'https': 'http://proxy.test:8080'})
-        ok('acici verilen proxy ile kurulur', handlers and handlers[0].proxies == proxies)
+        config = bk.update._main_thread_proxies()
+        proxies, bypass = config
+        ok('proxy ve bypass ana is parcaciginda okunur', proxies == {'https': 'http://proxy.test:8080'}
+           and bypass.get('api.github.com') is True and bypass.get('github.com') is False, config)
         n = len(calls)
-        bk.update._opener({})
-        ok('acici kurarken sistem sorgusu yok', len(calls) == n)
+        opener = bk.update._opener(config)
+        handlers = [h for h in opener.handlers if isinstance(h, urllib.request.ProxyHandler)]
+        ok('acici verilen proxy ile kurulur', handlers and handlers[0].proxies == proxies)
+        req = urllib.request.Request('https://github.com/x')
+        handlers[0].proxy_open(req, proxies['https'], 'https')
+        bk.update._opener(({}, {}))
+        ok('acici ve proxy_open sistem sorgusu yapmaz', len(calls) == n, calls[n:])
     finally:
-        urllib.request.getproxies = real
+        urllib.request.getproxies, urllib.request.proxy_bypass = real, real_bypass
 
 
 def test_keymap_and_settings():

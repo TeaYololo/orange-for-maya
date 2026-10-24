@@ -9,7 +9,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui2
 
-from .compat import (ALT, CTRL, EV_KEY_PRESS, EV_KEY_RELEASE, EV_MMOVE, EV_MPRESS, EV_MRELEASE, EV_SHORTCUT,
+from .compat import (CTRL_KEY, wheel_steps, ALT, CTRL, EV_KEY_PRESS, EV_KEY_RELEASE, EV_MMOVE, EV_MPRESS, EV_MRELEASE, EV_SHORTCUT,
     EV_WHEEL, LMB, MMB, NOBTN, Qt, QtCore, QtGui, QtWidgets, RMB, SHIFT, wrapInstance)
 from .core import _current_filter_set_modal, _filter, _msg, _state, _tip, _warn, run_after_op
 from .settings import FRAME_NAMES, PIVOT_NAMES, SNAP_NAMES, set_setting, setting
@@ -556,7 +556,7 @@ class Modal(object):
         return QtWidgets.QApplication.keyboardModifiers()
 
     def _ctrl(self):
-        return bool(self._mods() & CTRL)
+        return bool(self._mods() & CTRL_KEY)
 
     def _fine(self):
         """Shift+Ctrl: ince adim (Blender: 0.1 birim / 1 derece / 0.01)."""
@@ -1136,11 +1136,11 @@ class Modal(object):
             if self.fields is None:
                 self.fields = ['', '', '']
             self.fields[self.field_axis] = self.numeric
-            self.field_axis = (self.field_axis + (-1 if mods & CTRL else 1)) % 3
+            self.field_axis = (self.field_axis + (-1 if mods & CTRL_KEY else 1)) % 3
             self.numeric = self.fields[self.field_axis]
             self._revert_for_numeric()
         elif key == int(Qt.Key.Key_Backspace):
-            if mods & CTRL or not self.numeric:
+            if mods & CTRL_KEY or not self.numeric:
                 self.numeric, self.fields, self.field_axis = '', None, 0
             else:
                 self.numeric = self.numeric[:-1]
@@ -1195,7 +1195,9 @@ class Modal(object):
             self.auto_plane = False
             self._show()
         elif etype == EV_WHEEL:
-            self._wheel(ev.angleDelta().y() > 0)
+            steps = wheel_steps(ev)
+            for _ in range(min(abs(steps), 8)):
+                self._wheel(steps > 0)
         return etype != EV_MMOVE
 
     def finish(self, ok):

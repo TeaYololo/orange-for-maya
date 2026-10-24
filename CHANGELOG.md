@@ -4,6 +4,16 @@
 
 - **Açılış koruması (macOS'ta Maya'nın her açılışta çökmesi, #4):** Orange başlarken vardığı adımı diske yazar. Maya bir önceki başlatmada çöktüyse Orange o açılışta kendiliğinden başlamaz; Maya açılır, Orange menüsünde yarıda kalan adım ve **Şimdi başlat** görünür. Adım, "Sorun bildir" tanılama metnine de eklenir.
 - **Güncelleme denetimi:** sistem proxy ayarları artık ana iş parçacığında okunur. macOS'ta urllib bu ayarı SystemConfiguration üzerinden soruyor; sorgu arka plan iş parçacığında yapılınca Maya çökebiliyordu.
+- **macOS:**
+  - Güncelleme denetimi proxy kullanan Mac'lerde de arka planda sistem sorgusu yapmaz: hangi sunucunun proxy'siz gideceği de (`proxy_bypass`) ana iş parçacığında belirlenir.
+  - Modifier paneli dock'ta açıkken Maya kapatılırsa, Maya bir sonraki açılışta paneli artık kendi geri yükleme anında kurmaz; Orange başladıktan sonra kurar. Önceki açılış yarıda kaldıysa panel de açılmaz. Bu yol önceden açılış korumasının dışındaydı.
+  - Fiziksel **Ctrl** tuşu Ctrl kısayollarında çalışır (Qt Mac'te Ctrl'u Meta olarak verir; önceden Ctrl+R döndürmeyi, Ctrl+B kutu seçimini başlatıyordu). Cmd de Ctrl sayılmaya devam eder.
+  - **Option+A** (seçimi kaldır) çalışır; Mac'in **delete** tuşu Delete kısayolu olur.
+  - Trackpad / Magic Mouse kaydırması: küçük parçalar biriktirilir, momentum yok sayılır (loop cut sayısı, Alt+tekerlek kare adımı ve proportional alan kendiliğinden kaymaz).
+  - F3 penceresi dışarı tıklanınca kapanır ve her F3'te yeni pencere birikmez. Pie menüsü Mac'te kendini ayrıca etkinleştirmez.
+  - Modifier kartı sürükle-bırak: taşıma, sürükleme döngüsü bittikten sonra yapılır (silinmiş karta erişim riski). Modifier paneli Mac'te Segoe UI fontu aramaz.
+  - Tuş testi penceresi kapatılmadan silinirse (yeniden yükleme / dil değişimi) kısayollar kilitli kalmaz.
+  - `ORANGE_DISABLE=1` ortam değişkeniyle Orange açılışta hiç başlamaz (kurtarma için).
 - **F ile tek tek yüz doldurma (#5):** deliğin kenarındaki tek bir köşe seçiliyken F, o köşeden bir yüz açar (Blender gibi): üçgen / dörtgen delik tamamen kapanır, büyük delikte daha kısa yeni kenarlı dörtgen seçilir ve sonraki köşe seçili kalır; F'ye tekrar basmak deliği n-gon oluşturmadan yüz yüz doldurur. Bitişik sınır kenarlarından oluşan açık bir zincirle F, yalnızca o köşelerden tek bir yüz yapar (önceden bütün delik tek n-gon ile kapanıyordu). Yeni yüzün yönü komşu yüzlerle tutarlıdır.
 
 ## 1.0.1 — 2026-10-21

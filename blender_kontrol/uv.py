@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 import maya.cmds as cmds
 import maya.mel as mel
 
-from .compat import (CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
+from .compat import (CTRL_KEY, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
     SHIFT, _main_window, wrapInstance)
 from .core import _current_filter_set_modal, _msg, _tip, _warn
 from .i18n import _t
@@ -156,7 +156,7 @@ class UvModal(object):
         num = Modal._parse_memo(self, self.numeric)
         dx = (self.eff.x() - self.start_pos.x())
         dy = -(self.eff.y() - self.start_pos.y())
-        ctrl = bool(Modal._mods() & CTRL)
+        ctrl = bool(Modal._mods() & CTRL_KEY)
         if self.kind == 'move':
             if num is not None:
                 du, dv = (0.0, num) if self.axis == 'y' else (num, 0.0)
@@ -270,7 +270,7 @@ class UvModal(object):
             self.start_pos = QtCore.QPointF(self.eff)
             self.update(force=True)
         elif key == int(Qt.Key.Key_Backspace):
-            self.numeric = '' if ev.modifiers() & CTRL else self.numeric[:-1]
+            self.numeric = '' if ev.modifiers() & CTRL_KEY else self.numeric[:-1]
             self.update(force=True)
         elif text and text in '0123456789.,-':
             if text == '-' and self.numeric:

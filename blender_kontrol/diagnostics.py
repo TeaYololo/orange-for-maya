@@ -81,6 +81,10 @@ def _flags(value):
         return int(getattr(value, 'value', 0))
 
 
+def _release_capture(*_):
+    _state['capturing'] = False
+
+
 class KeyTestDialog(QtWidgets.QDialog):
     """Basilan tusun ham kodlarini ve Orange'in onu nasil okudugunu gosterir (macOS / Linux tablolarini
     duzeltmek icin). Acikken Orange kisayollari devre disidir."""
@@ -112,6 +116,8 @@ class KeyTestDialog(QtWidgets.QDialog):
         layout.addLayout(buttons)
         self.lines = []
         _state['capturing'] = True
+        # Yeniden yukleme / dil degisimi pencereyi close() olmadan siler: kilit kalirsa butun kisayollar olur
+        self.destroyed.connect(_release_capture)
 
     @staticmethod
     def describe(ev):

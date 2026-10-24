@@ -8,7 +8,7 @@ import maya.cmds as cmds
 
 from .compat import (ALT, CTRL, EV_KEY_PRESS, EV_KEY_RELEASE, EV_MDBL, EV_MMOVE, EV_MPRESS, EV_MRELEASE,
     EV_SHORTCUT, EV_WHEEL, KEY_EVENTS, LMB, MMB, MOUSE_EVENTS, NOBTN, Qt, QtCore, QtGui, QtWidgets, RMB, SHIFT,
-    _event_global_pos)
+    _event_global_pos, wheel_steps)
 from .core import _state, _warn
 from .settings import cached_setting
 from .i18n import _t
@@ -187,8 +187,10 @@ class BlenderFilter(QtCore.QObject):
         if t == EV_WHEEL:
             mods = ev.modifiers()
             if mods & ALT and not mods & (CTRL | SHIFT) and _context()[0] == 'view':
-                # Blender Alt+tekerlek: kare kaydir (asagi = ileri)
-                QtCore.QTimer.singleShot(0, functools.partial(frame_step, -1 if ev.angleDelta().y() > 0 else 1))
+                # Blender Alt+tekerlek: kare kaydir (asagi = ileri); trackpad parcalari biriktirilir
+                steps = wheel_steps(ev)
+                if steps:
+                    QtCore.QTimer.singleShot(0, functools.partial(frame_step, -steps))
                 return True
             return False
         if t == EV_MMOVE and self.nav is None and self.fwd is None and self.eat_release is None \

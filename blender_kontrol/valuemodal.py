@@ -8,7 +8,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui2
 
-from .compat import (CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
+from .compat import (CTRL_KEY, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
     SHIFT, wrapInstance)
 from .core import _current_filter_set_modal, _tip, _warn, run_after_op
 from .i18n import _t
@@ -82,7 +82,7 @@ class ValueModal(object):
         else:
             x, y = self._port(self.eff)
             v = self.start_value + (math.hypot(x - self.center_2d[0], y - self.center_2d[1]) - self.d0) * self.scale
-            if Modal._mods() & CTRL:
+            if Modal._mods() & CTRL_KEY:
                 step = self.step * (0.1 if Modal._mods() & SHIFT else 1.0)
                 v = round(v / step) * step
         if self.lo is not None:
@@ -137,7 +137,7 @@ class ValueModal(object):
         elif key == int(Qt.Key.Key_Escape):
             self.finish(False)
         elif key == int(Qt.Key.Key_Backspace):
-            self.numeric = '' if ev.modifiers() & CTRL else self.numeric[:-1]
+            self.numeric = '' if ev.modifiers() & CTRL_KEY else self.numeric[:-1]
             self.update(force=True)
         elif text and text in '0123456789.,-':
             if text == '-' and self.numeric:

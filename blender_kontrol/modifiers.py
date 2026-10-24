@@ -9,13 +9,14 @@ from __future__ import absolute_import, division, print_function
 
 import math
 import os
+import sys
 import uuid
 
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
 from .compat import Qt, QtCore, QtGui, QtWidgets
-from .core import _msg, _warn
+from .core import _msg, _state, _warn
 from .i18n import _t
 from .util import _mesh_fn, _objs, _shape_type, undoable
 from .editmode import edit_targets, exit_edit, in_edit
@@ -46,7 +47,7 @@ MIRROR_MERGE_ON, MIRROR_MERGE_OFF = 1, 3
 EDIT_CAGES = {}
 _EDIT_JOB = None
 PANEL_NAME = 'BlenderKontrolModifiers'
-_UI_SCRIPT = 'import blender_kontrol.modifiers as m; m.show_panel()'
+_UI_SCRIPT = 'import blender_kontrol.modifiers as m; m.restore_panel()'
 
 
 # ---------------------------------------------------------------- yardimcilar
@@ -1402,6 +1403,7 @@ class _ModifierCardHeader(QtWidgets.QToolButton):
                     drag.exec_(Qt.MoveAction)
                 self._panel._clear_drag_preview(clear_source=True)
                 self._press_pos = None
+                _run_pending_move(self._panel)
                 return
         super(_ModifierCardHeader, self).mouseMoveEvent(event)
 
@@ -1454,6 +1456,7 @@ class _ModifierDragHandle(QtWidgets.QToolButton):
                 drag.exec_(Qt.MoveAction)
             self._panel._clear_drag_preview(clear_source=True)
             self._press_pos = None
+            _run_pending_move(self._panel)
             return
         super(_ModifierDragHandle, self).mouseMoveEvent(event)
 
@@ -1513,8 +1516,9 @@ class _ModifierCardFrame(QtWidgets.QFrame):
             panel._clear_drag_preview(clear_source=True)
             return
         event.acceptProposedAction()
-        QtCore.QTimer.singleShot(0, lambda: panel._run(
-            lambda: move_history_card(panel.base, source_node, target_node, after=after)))
+        # Tasima, surukleme dongusu (drag.exec) bittikten sonra kaynak karttan baslatilir: macOS'ta birakma
+        # Qt'nin ic dongusunde gelir ve oradaki zamanlayici kartlari kaynak kartin olayi bitmeden silebiliyordu.
+        panel._pending_move = (source_node, target_node, after)
         panel._clear_drag_preview(clear_source=True)
 
     def _update_drop_preview(self, event):
@@ -1541,7 +1545,8 @@ class ModifierPanel(MayaQWidgetDockableMixin, QtWidgets.QDialog):
         self.resize(420, 760)
         self.setMinimumSize(360, 460)
         panel_font = self.font()
-        panel_font.setFamily('Segoe UI')
+        if sys.platform == 'win32':
+            panel_font.setFamily('Segoe UI')    # macOS'ta yok: Qt font takma adlarini tararken arayuz takiliyordu
         panel_font.setPointSizeF(9.5)
         self.setFont(panel_font)
         check_icon = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'icons', 'check_white.svg')
@@ -2349,7 +2354,43 @@ def _show_dockable_panel(panel):
         return False
 
 
+def restore_panel():
+    """workspaceControl uiScript'i: Maya acilista dock'u geri yuklerken cagirir. O anda paneli kurmak (scriptJob,
+    sahne sorgusu, gerekirse ayni kontrolu silip yeniden kurmak) Maya'yi her acilista cokertebilir ve Orange'in
+    baslatma korumasinin disinda kalir; panel Maya acilisi ve Orange baslatmasi bittikten sonra kurulur."""
+    if os.environ.get('ORANGE_DISABLE'):
+        return
+    cmds.evalDeferred(_restore_deferred, lowestPriority=True)
+
+
+def _restore_deferred():
+    try:
+        from .lifecycle import startup_blocked   # dongusel import: cagri aninda
+        if startup_blocked():
+            return      # onceki acilis yarida kaldi: paneli de kurma
+    except Exception:
+        pass
+    try:
+        show_panel()
+    except Exception as exc:
+        _warn('modifier panel: %s' % exc)
+
+
+def _run_pending_move(panel):
+    """Surukleme dongusu bittikten sonra (kaynak kart artik olay icinde degil) bekleyen tasimayi yap."""
+    pending = getattr(panel, '_pending_move', None)
+    panel._pending_move = None
+    if pending:
+        source_node, target_node, after = pending
+        QtCore.QTimer.singleShot(0, lambda: panel._run(
+            lambda: move_history_card(panel.base, source_node, target_node, after=after)))
+
+
 def show_panel():
+    if not _state.get('maya_started') and not cmds.about(batch=True):
+        # Eski surumlerin kaydettigi uiScript (m.show_panel()) Maya acilisinda da buraya gelir
+        restore_panel()
+        return None
     for w in _open_panels():
         if type(w).__module__ != __name__:
             # Yeniden yuklemeden kalan eski modul paneli: yeni modulle calisamaz, sil ve yeniden kur.

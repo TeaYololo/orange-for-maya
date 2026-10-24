@@ -8,7 +8,7 @@ import json
 import maya.cmds as cmds
 import maya.mel as mel
 
-from .compat import CTRL, EV_KEY_PRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
+from .compat import CTRL_KEY, CTRL, EV_KEY_PRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
 from .core import _msg, _search_cache
 from .settings import set_setting, setting
 from .i18n import _t
@@ -124,6 +124,12 @@ class SearchPalette(QtWidgets.QDialog):
         self._runtime_loading = False
         super(SearchPalette, self).closeEvent(ev)
 
+    def event(self, ev):
+        # Arac penceresi (Popup degil): disari tiklaninca kendiliginden kapanmaz; odak gidince kapat
+        if ev.type() == QtCore.QEvent.Type.WindowDeactivate and self.isVisible():
+            QtCore.QTimer.singleShot(0, self.close)
+        return super(SearchPalette, self).event(ev)
+
     def reject(self):
         """Esc: QDialog.reject yalniz gizler; WA_DeleteOnClose icin kapatmak gerekir (her F3+Esc sizmasin)."""
         self.close()
@@ -146,7 +152,7 @@ class SearchPalette(QtWidgets.QDialog):
 
     def eventFilter(self, obj, ev):
         if (ev.type() == EV_KEY_PRESS and int(ev.key()) in (int(Qt.Key.Key_Return), int(Qt.Key.Key_Enter))
-                and ev.modifiers() & CTRL):
+                and ev.modifiers() & CTRL_KEY):
             item = self.list.currentItem()
             if item:
                 add_favorite(*item.data(Qt.ItemDataRole.UserRole))
@@ -173,11 +179,23 @@ class SearchPalette(QtWidgets.QDialog):
             QtCore.QTimer.singleShot(0, lambda: mel.eval(name))
 
 
+_palette = []    # acik F3 penceresi (her F3 yeni pencere biriktirmesin)
+
+
 def show_search():
+    for old in _palette:
+        try:
+            old.close()
+        except RuntimeError:
+            pass        # Qt nesnesi zaten silinmis
+    del _palette[:]
     dlg = SearchPalette()
+    _palette.append(dlg)
     pos = QtGui.QCursor.pos()
     dlg.move(_clamp_to_screen(pos - QtCore.QPoint(260, 20), dlg.size(), pos))
     dlg.show()
+    dlg.raise_()
+    dlg.activateWindow()
     dlg.edit.setFocus()
 
 

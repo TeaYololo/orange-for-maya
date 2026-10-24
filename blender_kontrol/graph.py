@@ -6,7 +6,7 @@ import maya.cmds as cmds
 import maya.mel as mel
 import maya.api.OpenMaya as om
 
-from .compat import CTRL, EV_KEY_PRESS, QtCore, QtGui, QtWidgets, wrapInstance
+from .compat import CTRL_KEY, CTRL, EV_KEY_PRESS, QtCore, QtGui, QtWidgets, wrapInstance
 from .core import _current_filter_set_modal, _msg, _tip, _warn
 from .i18n import _t
 from .keys import _phys
@@ -66,7 +66,7 @@ class KeyMoveModal(ValueModal):
             num = Modal._parse(self.numeric) if self.numeric else None
             dt = 0.0 if self.axis == 'y' else (num if num is not None else d.x() * self.tpp)
             dv = 0.0 if (self.axis == 'x' or not self.graph) else (num if (num is not None and self.axis == 'y') else -d.y() * self.vpp)
-            if not Modal._mods() & CTRL:
+            if not Modal._mods() & CTRL_KEY:
                 dt = round(dt)            # Blender: en yakin kareye otomatik snap
             if (dt, dv) != self.applied:
                 cmds.keyframe(edit=True, relative=True, option='over', includeUpperBound=True,

@@ -5,7 +5,7 @@ from __future__ import absolute_import, division, print_function
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-from .compat import CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, EV_WHEEL, LMB, Qt, QtCore, QtGui, RMB
+from .compat import CTRL_KEY, wheel_steps, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, EV_WHEEL, LMB, Qt, QtCore, QtGui, RMB
 from .core import _current_filter_set_modal, _msg, _warn, run_after_op
 from .i18n import _t
 from .util import _comp, _last_view_panel, _mesh_fn, _objs, _set_world_points, _shape_type
@@ -165,7 +165,7 @@ class LoopCut(object):
                 px, py = self.picker.port(pos)
                 t = max(0.0, min(1.0, _seg_dist(px, py, a, b)[1]))
                 f = max(-1.0, min(1.0, (t - 0.5) * 2.0))      # -1..1: dis kesimler kenar uclarina kadar
-                if Modal._mods() & CTRL:
+                if Modal._mods() & CTRL_KEY:
                     f = round(f * 10) / 10.0
                 d = f * self.multi_dmax
                 if abs(d - self.multi_d) > 1e-9:
@@ -177,7 +177,7 @@ class LoopCut(object):
                 b = self.picker.screen(self.ends[1])
                 px, py = self.picker.port(pos)
                 t = max(0.0, min(1.0, _seg_dist(px, py, a, b)[1]))
-                if Modal._mods() & CTRL:
+                if Modal._mods() & CTRL_KEY:
                     t = round(t * 10) / 10.0
                 cmds.setAttr(self.node + '.weight', t)
                 self._show('%.2f' % t)
@@ -269,7 +269,9 @@ class LoopCut(object):
             elif ev.button() == RMB:
                 self._cancel()
         elif etype == EV_WHEEL and self.state == 'hover':
-            self._set_count(1 if ev.angleDelta().y() > 0 else -1)
+            steps = wheel_steps(ev)
+            if steps:
+                self._set_count(steps)
         return etype != EV_MMOVE
 
     def _resume_undo(self):

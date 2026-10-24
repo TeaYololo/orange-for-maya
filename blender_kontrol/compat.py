@@ -2,6 +2,8 @@
 """Qt / PySide2-6 uyumlulugu, olay ve dugme sabitleri, ana pencere."""
 from __future__ import absolute_import, division, print_function
 
+import sys
+
 import maya.OpenMayaUI as omui
 
 try:
@@ -35,6 +37,11 @@ CTRL = Qt.KeyboardModifier.ControlModifier
 ALT = Qt.KeyboardModifier.AltModifier
 KEYPAD = Qt.KeyboardModifier.KeypadModifier
 NOMOD = Qt.KeyboardModifier.NoModifier
+META = Qt.KeyboardModifier.MetaModifier
+# macOS'ta Qt Cmd'yi ControlModifier, fiziksel Ctrl'u MetaModifier yapar. Blender Mac'te de modelleme
+# kisayollari fiziksel Ctrl ile: klavye kisayollarinda ve basili tutulan Ctrl'de ikisi de 'ctrl' sayilir.
+# (Fare tiklamalarinda degil: Cocoa Ctrl+sol tiki sag tik yapar.)
+CTRL_KEY = (CTRL | META) if sys.platform == 'darwin' else CTRL
 
 
 # ---------------------------------------------------------------- yardimcilar
@@ -62,6 +69,30 @@ def _exec_menu(menu):
         getattr(menu, 'exec')(pos)
     else:
         menu.exec_(pos)
+
+
+_wheel_acc = [0]
+
+
+def wheel_steps(ev):
+    """Tekerlek olayindan tam adim sayisi (+ yukari / - asagi). Fare tekerlegi her olayda 120'nin katini verir;
+    trackpad / Magic Mouse kucuk parcalar, momentum ve sifir olaylar yollar: parcalar biriktirilir, momentum ve
+    sifir olaylar yok sayilir (yoksa loop cut sayisi, kare adimi, proportional alan kendiliginden kayiyordu)."""
+    try:
+        if ev.phase() == Qt.ScrollPhase.ScrollMomentum:
+            return 0
+    except Exception:
+        pass
+    delta = ev.angleDelta().y() or ev.angleDelta().x()
+    if not delta:
+        return 0
+    if delta % 120 == 0:
+        _wheel_acc[0] = 0
+        return delta // 120
+    _wheel_acc[0] += delta
+    steps = int(_wheel_acc[0] / 120)
+    _wheel_acc[0] -= steps * 120
+    return steps
 
 
 def _event_global_pos(ev):

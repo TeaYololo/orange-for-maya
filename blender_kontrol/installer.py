@@ -40,6 +40,10 @@ import maya.utils
 
 
 def _orange_startup():
+    import os
+    if os.environ.get('ORANGE_DISABLE'):
+        print("[Orange] ORANGE_DISABLE set: not started")
+        return
     try:
         import blender_kontrol
         updated = blender_kontrol.update.apply_pending_update()

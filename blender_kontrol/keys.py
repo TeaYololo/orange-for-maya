@@ -4,7 +4,7 @@ from __future__ import absolute_import, division, print_function
 
 import sys
 
-from .compat import ALT, CTRL, KEYPAD, Qt, SHIFT
+from .compat import ALT, CTRL_KEY, KEYPAD, Qt, SHIFT
 from .settings import cached_setting
 
 
@@ -60,8 +60,9 @@ def _phys(ev, platform=None):
         vk = ev.nativeVirtualKey()
         if vk in MAC_NUMPAD and (keypad or vk not in MAC_VK):
             return MAC_NUMPAD[vk], True
-        if vk == 0 and int(ev.key()) != int(Qt.Key.Key_A) and ev.text().lower() not in ('a', 'q'):
-            return None, keypad   # kVK_ANSI_A = 0 ile "bilgi yok" ayni deger
+        if vk == 0 and int(ev.key()) not in (int(Qt.Key.Key_A), int(Qt.Key.Key_Aring)) \
+                and ev.text().lower() not in ('a', 'q', u'\u00e5'):
+            return None, keypad   # kVK_ANSI_A = 0 ile "bilgi yok" ayni deger (Option+A: key Aring, metin a-halka)
         return MAC_VK.get(vk), False
     sc = ev.nativeScanCode()
     if platform == 'linux':
@@ -90,6 +91,10 @@ SPECIAL_KEYS = ('delete', 'home', 'space', 'left', 'right', 'up', 'down', 'f1', 
                 'pgup', 'pgdown', 'end')
 for _c in range(26):
     QT_KEYS.setdefault(int(Qt.Key.Key_A) + _c, chr(ord('a') + _c))
+if sys.platform == 'darwin':
+    # Mac klavyesindeki "delete" tusu Backspace'tir (ileri silme fn+delete); Blender Mac'te de onu Delete sayar.
+    # Yazi alanlari ve modallar (sayi silme) once isler, buraya gelmez.
+    QT_KEYS[int(Qt.Key.Key_Backspace)] = 'delete'
 
 
 def _combo_label(combo):
@@ -127,7 +132,7 @@ def _key_name(ev, platform=None):
 def _combo(ev, name):
     mods = ev.modifiers()
     parts = []
-    if mods & CTRL:
+    if mods & CTRL_KEY:
         parts.append('ctrl')
     if mods & ALT:
         parts.append('alt')

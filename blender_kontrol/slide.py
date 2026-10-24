@@ -8,7 +8,7 @@ import maya.cmds as cmds
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui2
 
-from .compat import (CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
+from .compat import (CTRL_KEY, CTRL, EV_KEY_PRESS, EV_MMOVE, EV_MPRESS, EV_SHORTCUT, LMB, Qt, QtCore, QtGui, QtWidgets, RMB,
     SHIFT, wrapInstance)
 from .core import _current_filter_set_modal, _msg, _tip, _warn, run_after_op
 from .i18n import _t
@@ -193,7 +193,7 @@ class EdgeSlide(object):
         sx, sy = self._port(self.start_pos)
         mx, my = self._port(self.eff)
         dx, dy = mx - sx, my - sy
-        ctrl = bool(Modal._mods() & CTRL)
+        ctrl = bool(Modal._mods() & CTRL_KEY)
         out = {}
         if self.mode == 'edge':
             if num is not None:
@@ -312,7 +312,7 @@ class EdgeSlide(object):
         elif key == int(Qt.Key.Key_Escape):
             self.finish(False)
         elif key == int(Qt.Key.Key_Backspace):
-            self.numeric = '' if ev.modifiers() & CTRL else self.numeric[:-1]
+            self.numeric = '' if ev.modifiers() & CTRL_KEY else self.numeric[:-1]
             self.update(force=True)
         elif text and text in '0123456789.,-':
             if text == '-' and self.numeric:

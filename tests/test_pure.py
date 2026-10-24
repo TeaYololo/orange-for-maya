@@ -107,7 +107,56 @@ KEY_CASES = [
     ('mac', Qt.Key.Key_G, NO, 0, 0x05, 'g', 'g'), ('mac', Qt.Key.Key_A, NO, 0, 0, 'a', 'a'),
     ('mac', Qt.Key.Key_unknown, NO, 0, 0, '', None), ('mac', Qt.Key.Key_unknown, NO, 0, 0x22, u'ı', 'i'),
     ('mac', Qt.Key.Key_7, KP, 0, 0x59, '7', 'np7'), ('mac', Qt.Key.Key_Period, KP, 0, 0x41, '.', 'np.'),
+    # Option+A: Cocoa metni a-halka, Qt tusu Key_Aring; kVK_ANSI_A = 0 yine 'a' sayilmali
+    ('mac', Qt.Key.Key_Aring, Qt.KeyboardModifier.AltModifier, 0, 0, u'å', 'a'),
 ]
+
+
+def test_mac_physical_ctrl(monkeypatch):
+    """macOS: Qt fiziksel Ctrl'u MetaModifier, Cmd'yi ControlModifier verir; ikisi de 'ctrl' olmali."""
+    meta, ctrl = Qt.KeyboardModifier.MetaModifier, Qt.KeyboardModifier.ControlModifier
+    monkeypatch.setattr(keys, 'CTRL_KEY', ctrl | meta)
+    for mods in (meta, ctrl):
+        ev = QtGui.QKeyEvent(QtCore.QEvent.Type.KeyPress, Qt.Key.Key_R, mods, 0, 0x0F, 0, 'r')
+        assert keys._combo(ev, keys._key_name(ev, 'mac')) == 'ctrl+r'
+
+
+def test_wheel_steps():
+    """Trackpad parcalari biriktirilir; momentum ve sifir olaylar adim vermez; fare tekerlegi 120'de bir."""
+    from blender_kontrol import compat
+
+    class Ev(object):
+        def __init__(self, dy, phase=Qt.ScrollPhase.NoScrollPhase):
+            self._dy, self._phase = dy, phase
+
+        def phase(self):
+            return self._phase
+
+        def angleDelta(self):
+            return QtCore.QPoint(0, self._dy)
+
+    compat._wheel_acc[0] = 0
+    assert compat.wheel_steps(Ev(120)) == 1 and compat.wheel_steps(Ev(-240)) == -2
+    assert compat.wheel_steps(Ev(0)) == 0
+    assert [compat.wheel_steps(Ev(30)) for _ in range(4)] == [0, 0, 0, 1]
+    assert compat.wheel_steps(Ev(600, Qt.ScrollPhase.ScrollMomentum)) == 0
+
+
+def test_update_proxy_handler_skips_system_lookup(monkeypatch):
+    """#4: is parcacigindaki acici proxy_bypass'i (macOS'ta _scproxy) hic cagirmamali."""
+    import urllib.request
+    from blender_kontrol import update
+
+    def boom(*_a, **_k):
+        raise AssertionError('proxy_bypass called from the worker')
+    monkeypatch.setattr(urllib.request, 'proxy_bypass', boom)
+    handler = update._PresetProxyHandler({'https': 'http://proxy.test:8080'}, {'api.github.com': True})
+    direct = urllib.request.Request('https://api.github.com/x')
+    assert handler.proxy_open(direct, 'http://proxy.test:8080', 'https') is None
+    assert direct.host == 'api.github.com' and not direct._tunnel_host        # proxy'siz
+    via = urllib.request.Request('https://github.com/x')
+    assert handler.proxy_open(via, 'http://proxy.test:8080', 'https') is None
+    assert via.host == 'proxy.test:8080' and via._tunnel_host == 'github.com'   # proxy uzerinden tunel
 
 
 @pytest.mark.parametrize('plat,key,mods,sc,vk,text,want', KEY_CASES)
