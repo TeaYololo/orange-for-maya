@@ -673,6 +673,71 @@ def test_unbound_key_returns_before_context_lookup(monkeypatch):
     assert filt._key(ev, QtCore.QEvent.Type.KeyPress) is False and len(calls) == 1
 
 
+def test_macos_event_filter_only_watches_widgets(monkeypatch):
+    """Avoid passing QtWebEngine's internal QObject events through PySide's global filter on macOS."""
+    from blender_kontrol import events
+
+    class Widget(object):
+        def __init__(self):
+            self.filters = []
+
+        def installEventFilter(self, filt):
+            self.filters.append(filt)
+
+        def removeEventFilter(self, filt):
+            if filt in self.filters:
+                self.filters.remove(filt)
+
+    class App(object):
+        def __init__(self):
+            self.widgets = [Widget()]
+            self.global_filters = []
+
+        def allWidgets(self):
+            return list(self.widgets)
+
+        def installEventFilter(self, filt):
+            self.global_filters.append(filt)
+
+        def removeEventFilter(self, filt):
+            if filt in self.global_filters:
+                self.global_filters.remove(filt)
+
+    app = App()
+
+    class QApplication(object):
+        @staticmethod
+        def instance():
+            return app
+
+    class FakeQtWidgets(object):
+        pass
+
+    FakeQtWidgets.QApplication = QApplication
+    monkeypatch.setattr(events, 'QtWidgets', FakeQtWidgets)
+    monkeypatch.setattr(events.sys, 'platform', 'darwin')
+    filt = events.BlenderFilter()
+    try:
+        filt.start_watching()
+        first = app.widgets[0]
+        assert first.filters == [filt]
+        assert app.global_filters == []
+
+        # A widget created after startup is enrolled on the next scan.
+        later = Widget()
+        app.widgets.append(later)
+        filt._watch_widgets()
+        assert later.filters == [filt]
+
+        # Wrappers are retained for the active widgets, so Python cannot recycle their ids mid-watch.
+        assert filt._watched[id(first)] is first
+        assert filt._watched[id(later)] is later
+    finally:
+        filt.stop_watching()
+        assert all(not widget.filters for widget in app.widgets)
+        assert app.global_filters == []
+
+
 def test_parse_memo_caches_per_text():
     class Owner(object):
         pass

@@ -608,7 +608,8 @@ def t_keys(c):
         c.ok('filtre kendini en uste aldi', filt.replays - before == 1, filt.replays - before)
         c.press('tab')
         c.flush()
-        c.ok('ikinci Tab dogrudan gelir (tekrar onarim yok)', not b.in_edit() and filt.replays - before == 1,
+        expected_replays = 2 if filt._widget_filter_mode else 1
+        c.ok('ikinci Tab da kaybolmadan islenir', not b.in_edit() and filt.replays - before == expected_replays,
              filt.replays - before)
     finally:
         app.removeEventFilter(thief)

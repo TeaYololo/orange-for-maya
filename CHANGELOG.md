@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## 1.0.3 — 2026-10-25
+
+- **macOS açılış çökmesi (#4):** PySide olay filtresi artık macOS'ta uygulama geneline değil yalnızca QWidget nesnelerine kurulur. Bu, Maya'daki QtWebEngine iç QObject olaylarının Orange filtresine ulaşmasını engeller. Yeni açılan widget'lar taranarak izlemeye eklenir ve Orange kapanırken filtreler kaldırılır.
+- **Açılış koruması:** geç açılan Qt ve eklenti başlangıç yollarındaki çökmeleri yakalamak için koruma süresi 60 saniyeye çıkarıldı.
+- macOS'a özgü filtre yolu Maya 2027 / Windows üzerinde simüle edildi; yerel macOS Maya doğrulaması henüz yapılmadı.
+
 ## 1.0.2 — 2026-10-24
 
 - **Açılış koruması (macOS'ta Maya'nın her açılışta çökmesi, #4):** Orange başlarken vardığı adımı diske yazar. Maya bir önceki başlatmada çöktüyse Orange o açılışta kendiliğinden başlamaz; Maya açılır, Orange menüsünde yarıda kalan adım ve **Şimdi başlat** görünür. Adım, "Sorun bildir" tanılama metnine de eklenir.

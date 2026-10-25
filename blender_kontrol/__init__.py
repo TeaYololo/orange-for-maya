@@ -31,7 +31,7 @@ fonksiyon icinde import edilir):
 """
 from __future__ import absolute_import, division, print_function
 
-__version__ = '1.0.2'
+__version__ = '1.0.3'
 PRODUCT = 'Orange'
 TAGLINE = 'Maya, the Blender way'
 

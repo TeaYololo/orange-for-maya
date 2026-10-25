@@ -49,7 +49,7 @@ def is_installed():
 # acilista kendiliginden baslamaz (Maya her acilista cokup kilitli kalmasin); menude adim ve "Simdi baslat" gorunur.
 STARTUP_MARKER = 'orange_startup.json'
 STARTUP_BLOCK_VAR = 'bk_startupBlocked'     # optionVar: yarida kalan adim ('' = engel yok)
-STARTUP_SETTLE_MS = 20000                   # acilis guncelleme denetimi (7 sn + 6 sn zaman asimi) de bu surede biter
+STARTUP_SETTLE_MS = 60000                   # yavas Mac'lerde gec gelen Qt/eklenti acilis cokerlerini de yakala
 
 
 def _marker_path():
@@ -158,7 +158,7 @@ def install(quiet=False):
     app = QtWidgets.QApplication.instance()
     startup_stage('event filter')
     filt = BlenderFilter(app)
-    app.installEventFilter(filt)
+    filt.start_watching()
     setattr(sys.modules['__main__'], _KEY, filt)
     try:
         _install_rest(app, filt, quiet)
@@ -238,7 +238,7 @@ def uninstall(quiet=False):
     timer = getattr(filt, 'keep_on_top', None)
     if timer is not None:
         timer.stop()
-    app.removeEventFilter(filt)
+    filt.stop_watching()
     try:
         app.applicationStateChanged.disconnect(_on_app_state)
     except Exception:

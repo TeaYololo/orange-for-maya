@@ -1,6 +1,6 @@
 [project]
 name = "orange-for-maya"
-version = "1.0.2"
+version = "1.0.3"
 description = "Orange: Maya, the Blender way. Blender keymap, modal tools, pie menus and 3D cursor for Autodesk Maya."
 readme = "README.md"
 license = { text = "Apache-2.0" }

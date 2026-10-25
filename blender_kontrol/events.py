@@ -3,6 +3,7 @@
 from __future__ import absolute_import, division, print_function
 
 import functools
+import sys
 
 import maya.cmds as cmds
 
@@ -65,11 +66,67 @@ class BlenderFilter(QtCore.QObject):
         self.sending = False
         self.pending = None    # kabul ettigimiz ShortcutOverride'in KeyPress'i bekleniyor (kopya olay)
         self.replays = 0       # baska bir filtre KeyPress'i yuttugu icin kendimiz isledigimiz tus sayisi
+        self._watched = {}     # id -> wrapper; guclu referanslar id'nin yeniden kullanilmasini onler
+        self._watch_timer = None
+        self._widget_filter_mode = False
+
+    def start_watching(self):
+        """macOS'ta QtWebEngine'in QWidget olmayan QObject'lerini uygulama filtresine sokma.
+
+        QtWebEngine kendi dahili QObject'lerine olay gonderir. macOS raporundaki crash, bu olay PySide'in
+        uygulama-geneli filtreyi cagirmasi sirasinda getWrapperForQObject icinde olusuyor. Klavye/fare
+        olaylarini QWidget filtreleriyle izle; diger platformlarda Maya'nin global filtre sirasi korunur.
+        """
+        self._widget_filter_mode = sys.platform == 'darwin'
+        if not self._widget_filter_mode:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.installEventFilter(self)
+            return
+        self._watch_widgets()
+        self._watch_timer = QtCore.QTimer(self)
+        self._watch_timer.timeout.connect(self._watch_widgets)
+        self._watch_timer.start(500)
+
+    def stop_watching(self):
+        if self._watch_timer is not None:
+            self._watch_timer.stop()
+            self._watch_timer = None
+        app = QtWidgets.QApplication.instance()
+        if app is not None:
+            if self._widget_filter_mode:
+                for widget in self._watched.values():
+                    try:
+                        widget.removeEventFilter(self)
+                    except RuntimeError:
+                        pass
+            else:
+                app.removeEventFilter(self)
+        self._watched.clear()
+
+    def _watch_widgets(self):
+        app = QtWidgets.QApplication.instance()
+        if app is None:
+            return
+        current = {}
+        for widget in app.allWidgets():
+            try:
+                widget_id = id(widget)
+                if widget_id not in self._watched:
+                    widget.installEventFilter(self)
+                current[widget_id] = widget
+            except RuntimeError:
+                continue
+        self._watched = current
 
     def eventFilter(self, obj, ev):
         if self.sending:
             return False
         try:
+            # This filter is attached only to QWidget instances. Keep this guard in case an old
+            # installation or host application still routes a non-widget QObject here.
+            if not obj.isWidgetType():
+                return False
             t = ev.type()
             if t in KEY_EVENTS:
                 if t == EV_KEY_PRESS:
@@ -117,11 +174,22 @@ class BlenderFilter(QtCore.QObject):
             _warn(_t('beklenmeyen hata (Maya normal çalışmaya devam ediyor): %s') % exc)
 
     def raise_to_top(self):
-        """Filtreyi yeniden kur: Qt en son kurulan uygulama filtresini once cagirir."""
+        """Filtreyi en sona ekle; Qt en son eklenen filtreyi once cagirir."""
+        if not self._widget_filter_mode:
+            app = QtWidgets.QApplication.instance()
+            if app is not None:
+                app.removeEventFilter(self)
+                app.installEventFilter(self)
+            return
+        self._watch_widgets()
         app = QtWidgets.QApplication.instance()
         if app is not None:
-            app.removeEventFilter(self)
-            app.installEventFilter(self)
+            for widget in app.allWidgets():
+                try:
+                    widget.removeEventFilter(self)
+                    widget.installEventFilter(self)
+                except RuntimeError:
+                    pass
 
     # -- klavye
     def _key(self, ev, t):
