@@ -25,6 +25,11 @@ SETTINGS = {
     'favorites': ('bk_favorites', '[]'),          # Q: JSON [[tur, ad], ...]
     'destructive_edit': ('bk_destructiveEdit', 0),  # edit modu islemleri gecmis birakmasin (Blender gibi)
     'overlay': ('bk_overlay', 'qt'),              # onizleme cizimi: qt (viewport ustu pencere) | vp2 (eklenti)
+    # Blender: Solid'de yalniz gorunen secilir, Wireframe / X-Ray'de arkadakiler de (#6)
+    'auto_camera_select': ('bk_autoCameraSelect', 1),
+    # O: proportional editing. Maya'nin soft select'i yalniz G / R / S sirasinda acilir (renkli alan
+    # surekli gorunmez, Blender gibi; #9)
+    'proportional': ('bk_proportional', 0),
 }
 
 PIVOT_NAMES = {'median': 'orta nokta', 'bbox': 'sınır kutusu', 'cursor': '3D imleç',

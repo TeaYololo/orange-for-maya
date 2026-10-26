@@ -1434,12 +1434,98 @@ def test_vp2_overlay():
     cmds.file(new=True, force=True)
 
 
+def test_issue_fixes_1_1():
+    """1.1.0: #8 bevel koseleri, #6 kamera tabanli secim, #9 proportional / orbit ayarlari."""
+    # #8: cok segmentli bevel'de kose tek n-gon olmamali (Maya'nin kendi Bevel'i gibi dortgenlerle kapanir)
+    def max_corner(subdivide):
+        cmds.file(new=True, force=True)
+        cube = cmds.polyCube(name='bevelCube')[0]
+        cmds.polyBevel3(cube + '.e[*]', offsetAsFraction=False, offset=0.15, segments=3, mitering=0,
+                        chamfer=True, subdivideNgons=subdivide)
+        return max(len(cmds.polyInfo(cube + '.f[%d]' % i, faceToVertex=True)[0].split(':')[1].split())
+                   for i in range(cmds.polyEvaluate(cube, face=True)))
+    ngon, quads = max_corner(False), max_corner(True)
+    ok('#8 bevel: subdivideNgons olmadan kose n-gon', ngon > 4, ngon)
+    ok('#8 bevel: subdivideNgons ile kose en fazla dortgen', quads <= 4, quads)
+    import inspect
+    ok('#8 Ctrl+B subdivideNgons kullanir', 'subdivideNgons=True' in inspect.getsource(bk.mesh._bevel_comps))
+
+    # #8 / #9: P profili (depth) geometriyi gercekten degistirir (fareyle ayarlanan ayar olu degil)
+    def corner_point(depth):
+        cmds.file(new=True, force=True)
+        cube = cmds.polyCube(name='profCube')[0]
+        node = cmds.polyBevel3(cube + '.e[0]', offsetAsFraction=False, offset=0.3, segments=3, chamfer=True,
+                               subdivideNgons=True)[0]
+        cmds.setAttr(node + '.depth', depth)
+        pts = cmds.xform(cube + '.vtx[*]', q=True, ws=True, t=True)
+        return [round(v, 4) for v in pts]
+    ok('#9 P profil (depth) sekli degistirir', corner_point(1.0) != corner_point(-1.0))
+
+    # #6: Wireframe / X-Ray'de arkadakiler de secilir, Solid'de yalniz gorunenler
+    before = (cmds.selectPref(q=True, useDepth=True), cmds.selectPref(q=True, paintSelectWithDepth=True))
+    bk.set_setting('auto_camera_select', 1)
+    bk.mayaprefs.sync_camera_selection(True)
+    through = (cmds.selectPref(q=True, useDepth=True), cmds.selectPref(q=True, paintSelectWithDepth=True))
+    bk.mayaprefs.sync_camera_selection(False)
+    solid = (cmds.selectPref(q=True, useDepth=True), cmds.selectPref(q=True, paintSelectWithDepth=True))
+    ok('#6 wireframe / x-ray: camera based selection kapali', through == (False, False), through)
+    ok('#6 solid: camera based selection acik', solid == (True, True), solid)
+    bk.set_setting('auto_camera_select', 0)
+    bk.mayaprefs.sync_camera_selection(True)
+    ok('#6 ayar kapaliyken dokunulmaz', (cmds.selectPref(q=True, useDepth=True),) == (True,))
+    bk.set_setting('auto_camera_select', 1)
+    cmds.selectPref(useDepth=before[0], paintSelectWithDepth=before[1])
+
+    # useDepth onceki degeri saklanir ve kaldirinca geri yuklenir (eski kurulumda da bir kez saklanir)
+    for var in bk.mayaprefs._PREV_VARS.values():
+        if cmds.optionVar(exists=var):
+            cmds.optionVar(remove=var)
+    cmds.selectPref(useDepth=False)
+    bk.mayaprefs._save_maya_defaults()
+    cmds.selectPref(useDepth=True)
+    bk.mayaprefs._restore_maya_defaults()
+    ok('#6 kaldirinca useDepth geri yuklenir', cmds.selectPref(q=True, useDepth=True) is False)
+    ok('#6 kaldirinca saklanan degerler silinir',
+       not any(cmds.optionVar(exists=v) for v in bk.mayaprefs._PREV_VARS.values()))
+    cmds.selectPref(useDepth=before[0], paintSelectWithDepth=before[1])
+
+    # #9: O proportional'i Orange ayari olarak acar; Maya soft select'i (renkli alan) acik birakmaz
+    bk.set_setting('proportional', 0)
+    cmds.softSelect(edit=True, softSelectEnabled=True)
+    bk.mesh.toggle_soft_select()          # Maya'da acik olan durumdan: kapat
+    ok('#9 O: Maya soft select acikken kapatir', not bk.setting('proportional')
+       and not cmds.softSelect(q=True, softSelectEnabled=True))
+    bk.mesh.toggle_soft_select()
+    ok('#9 O: proportional acik ama renkli alan gorunmez', bool(bk.setting('proportional'))
+       and not cmds.softSelect(q=True, softSelectEnabled=True))
+    bk.mesh.toggle_soft_select()
+    ok('#9 O: tekrar basinca kapanir', not bk.setting('proportional'))
+
+    # #9: proportional yalniz islem sirasinda acilir ve kapanir (Modal yardimcilari)
+    m = bk.Modal('move', 'modelPanel4')
+    m.soft_temp = True
+    cmds.softSelect(edit=True, softSelectEnabled=True)
+    m._end_soft_temp()
+    ok('#9 islem bitince gecici soft select kapanir', not cmds.softSelect(q=True, softSelectEnabled=True)
+       and not m.soft_temp)
+
+    # #9: Orbit Around Selection = tumble pivot + auto-set pivot (objectTumble degil)
+    import inspect as _inspect
+    src = _inspect.getsource(bk.mayaprefs._apply_camera_settings)
+    ok('#9 orbit: localTumble=0 + autoSetPivot', 'localTumble=0' in src and 'autoSetPivot=True' in src)
+
+    # #9: Ctrl+. origin duzenleme bagli
+    ok('#9 Ctrl+. origin duzenle', bk.BINDINGS.get('ctrl+period', {}).get('fn') is bk.objects.toggle_origin_edit)
+    cmds.file(new=True, force=True)
+
+
 def main():
     for fn in (test_i18n, test_keys, test_parse, test_mesh_helpers, test_selection_ops, test_mesh_ops, test_fill_corner, test_startup_guard, test_update_proxies,
                test_keymap_and_settings, test_grid_fill, test_modifiers, test_review_fixes, test_perf_fixes, test_modifier_fixes, test_update_fixes, test_blender_primitives,
                test_destructive_edit,
                test_fbx_roundtrip,
                test_vp2_overlay,
+               test_issue_fixes_1_1,
                test_installer):
         try:
             fn()

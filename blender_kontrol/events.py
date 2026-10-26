@@ -23,6 +23,7 @@ from .modal import _abort_modal
 from .selection import _end_circle_select, select_fill_region, select_loop, select_path
 from .modes import SCULPT_GLOBAL, _sculpting
 from .keymap import CONTEXT_KEYMAPS, SCULPT_KEYMAP, _active_bindings, _run_binding
+from .search import palette_guard
 
 
 def _typing():
@@ -128,6 +129,8 @@ class BlenderFilter(QtCore.QObject):
             if not obj.isWidgetType():
                 return False
             t = ev.type()
+            if (t == EV_KEY_PRESS or t == EV_MPRESS) and palette_guard(ev, t):
+                return True     # F3 penceresi Esc ile kapandi
             if t in KEY_EVENTS:
                 if t == EV_KEY_PRESS:
                     self.pending = None

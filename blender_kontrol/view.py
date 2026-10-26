@@ -241,15 +241,25 @@ def _editor(panel):
     return cmds.modelPanel(panel, q=True, modelEditor=True)
 
 
+def _sync_selection_depth(ed):
+    """Gorunum degisti: Wireframe ya da X-Ray ise arkadakiler de secilsin (Blender gibi, #6)."""
+    from .mayaprefs import sync_camera_selection  # dongusel import: cagri aninda
+    through = (cmds.modelEditor(ed, q=True, displayAppearance=True) == 'wireframe'
+               or bool(cmds.modelEditor(ed, q=True, xray=True)))
+    sync_camera_selection(through)
+
+
 def toggle_wireframe(panel):
     ed = _editor(panel)
     wire = cmds.modelEditor(ed, q=True, displayAppearance=True) == 'wireframe'
     cmds.modelEditor(ed, edit=True, displayAppearance='smoothShaded' if wire else 'wireframe')
+    _sync_selection_depth(ed)
 
 
 def toggle_xray(panel):
     ed = _editor(panel)
     cmds.modelEditor(ed, edit=True, xray=not cmds.modelEditor(ed, q=True, xray=True))
+    _sync_selection_depth(ed)
 
 
 def maximize_panel(panel):
@@ -300,6 +310,7 @@ def shading_pie(panel):
     def mode(appearance, textures, rendered=False):
         cmds.modelEditor(ed, edit=True, displayAppearance=appearance, displayTextures=textures,
                          displayLights='all' if rendered else 'default', shadows=rendered)
+        _sync_selection_depth(ed)
 
     def lights():
         current = cmds.modelEditor(ed, q=True, displayLights=True)

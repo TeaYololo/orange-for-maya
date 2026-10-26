@@ -419,6 +419,20 @@ EN = {
     '<b>M</b> köşe birleşimi (miter)': '<b>M</b> miter',
     '<b>Orta tuş</b> otomatik eksen (Shift: düzlem)': '<b>MMB</b> auto axis (Shift: plane)',
     '<b>P</b> profil': '<b>P</b> profile',
+    '<b>P</b> profil (fareyle)': '<b>P</b> profile (mouse)',
+    'Profil': 'Profile',
+    'Komut ara (F3)': 'Search (F3)',
+    'Origin düzenle (pivotu serbest taşı)': 'Edit origin (move the pivot freely)',
+    'Origin düzenlemek için bir obje seç': 'Select an object to edit its origin',
+    'Origin düzenleme kapalı': 'Origin editing off',
+    'Origin düzenleme: manipülatörle pivotu taşı / döndür  ·  bitince tekrar Ctrl+.':
+        'Origin editing: move / rotate the pivot with the manipulator  ·  press Ctrl+. again when done',
+    'Proportional editing: %s': 'Proportional editing: %s',
+    'açık  -  G / R / S sırasında tekerlek: alan': 'on  -  wheel during G / R / S: size',
+    'seçim ayarı uygulanamadı: %s': 'could not apply the selection setting: %s',
+    "Wireframe / X-Ray'de arkadakileri de seç": 'Select through in Wireframe / X-Ray',
+    'Solid görünümde yalnız görünenler seçilir; Wireframe ya da X-Ray açılınca arkadakiler de (Maya: camera based selection).':
+        'Solid view selects only what is visible; Wireframe or X-Ray also selects what is behind (Maya: camera based selection).',
     '<b>R R</b> serbest': '<b>R R</b> trackball',
     '<b>Sayı</b> yaz': '<b>Type</b> a number',
     '<b>Sayı</b> yaz (<b>=</b> ifade: 2m, 90d, pi)': '<b>Type</b> a number (<b>=</b> expression: 2m, 90d, pi)',
@@ -1007,6 +1021,7 @@ X/Y/Z axis (twice: global/local, three times: off) · Shift+X/Y/Z plane · C cle
 Alt + MMB navigate · Shift precision · Ctrl snap (Shift+Ctrl fine) · Shift+Tab toggle snapping · G/R/S switch · G G slide (Edit Mode) · R R trackball ·
 wheel/PageUp proportional size · type a number or expression (e.g. 2*3), - negates, Tab next axis (G 1 Tab 2 Enter), = expression mode (2m, 90d, pi/2)</td></tr>
 <tr><td><b>.</b> / <b>,</b></td><td>Pivot pie (median / bounding box / 3D cursor / active / individual) / orientation pie (global / local / normal / view / cursor / parent)</td></tr>
+<tr><td><b>Ctrl + .</b></td><td>Edit origin: move / rotate the pivot freely with the manipulator (Ctrl + . again to finish)</td></tr>
 <tr><td><b>Shift + Tab</b> / Shift + Ctrl + Tab</td><td>Toggle snapping / snap target (increment, vertex, edge, face). Ctrl inverts it while transforming</td></tr>
 <tr><td><b>Alt + G / R / S</b></td><td>Clear location / rotation / scale</td></tr>
 <tr><td><b>Ctrl + A</b></td><td>Apply (freeze), apply modifiers, delete history, make instances real</td></tr>
@@ -1023,7 +1038,7 @@ wheel/PageUp proportional size · type a number or expression (e.g. 2*3), - nega
 <tr><td><b>Shift + G</b></td><td>Select Grouped (children, parent, siblings, type, layer); Select Similar in Edit Mode</td></tr>
 <tr><td><b>Shift + S</b></td><td>Snap pie: cursor/selection → selection/cursor/grid/origin/active, origin → cursor</td></tr>
 <tr><td><b>Ctrl + 0..5</b></td><td>Live Subdivision modifier level</td></tr>
-<tr><td><b>O</b> / Shift + O / Alt + O</td><td>Proportional editing / falloff pie / connected only</td></tr>
+<tr><td><b>O</b> / Shift + O / Alt + O</td><td>Proportional editing (the falloff shows only during G / R / S, wheel: size) / falloff pie / connected only</td></tr>
 <tr><td><b>B</b> / <b>W</b> / <b>C</b></td><td>Box select / cycle select tools (box, lasso, circle) / circle select (exit with C, RMB or Esc)</td></tr>
 <tr><td><b>Shift + R</b></td><td>Repeat last</td></tr>
 </table>
@@ -1037,7 +1052,7 @@ wheel/PageUp proportional size · type a number or expression (e.g. 2*3), - nega
 <tr><td><b>Shift + A</b> (Edit Mode)</td><td>Add the primitive into the edited mesh</td></tr>
 <tr><td><b>E</b> / Alt + E</td><td>Extrude edges or faces (faces: along the normal; X/Y/Z lock to an axis, G move freely) / extrude menu (along normals, individual, edges). There is no vertex extrude: Maya meshes cannot have edges without faces</td></tr>
 <tr><td><b>I</b></td><td>Inset (I again: individual)</td></tr>
-<tr><td><b>Ctrl + B</b> / Shift + Ctrl + B</td><td>Bevel / bevel vertices (wheel: segments, P profile, M miter, C chamfer)</td></tr>
+<tr><td><b>Ctrl + B</b> / Shift + Ctrl + B</td><td>Bevel / bevel vertices (wheel: segments, P: adjust the profile with the mouse, M miter, C chamfer)</td></tr>
 <tr><td><b>Ctrl + R</b> / Ctrl + Shift + R</td><td>Loop cut: hover an edge, wheel for the number of cuts, click, slide (several cuts slide together), click / offset edge loop</td></tr>
 <tr><td><b>V</b></td><td>Rip (split and move)</td></tr>
 <tr><td><b>G G</b> / Shift + V</td><td>Edge slide (edge/face mode: along neighbouring edges, both directions; E even, F flip) / vertex slide (along the edge in the mouse direction). Type a number, Ctrl snap, Shift precision</td></tr>

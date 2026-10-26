@@ -4,11 +4,12 @@ from __future__ import absolute_import, division, print_function
 
 import functools
 import json
+import sys
 
 import maya.cmds as cmds
 import maya.mel as mel
 
-from .compat import CTRL_KEY, EV_KEY_PRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
+from .compat import CTRL_KEY, EV_KEY_PRESS, EV_MPRESS, Qt, QtCore, QtGui, QtWidgets, _main_window
 from .core import _msg, _search_cache
 from .settings import set_setting, setting
 from .i18n import _t
@@ -71,7 +72,14 @@ class SearchPalette(QtWidgets.QDialog):
     def __init__(self):
         # Qt.Popup grabs input on Cocoa; a non-modal tool window avoids
         # Maya becoming unresponsive when F3 is opened on macOS.
-        super(SearchPalette, self).__init__(_main_window(), Qt.WindowType.Tool | Qt.WindowType.FramelessWindowHint)
+        # macOS: a borderless window can never become the key window, so it got no keyboard focus (Esc did
+        # nothing) and was never activated, so the WindowDeactivate "click outside" close never fired (#7).
+        # Keep a normal title bar there; close-on-outside-click / Esc are also handled by palette_guard().
+        flags = Qt.WindowType.Tool
+        if sys.platform != 'darwin':
+            flags |= Qt.WindowType.FramelessWindowHint
+        super(SearchPalette, self).__init__(_main_window(), flags)
+        self.setWindowTitle(_t('Komut ara (F3)'))
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.resize(520, 380)
         layout = QtWidgets.QVBoxLayout(self)
@@ -180,6 +188,52 @@ class SearchPalette(QtWidgets.QDialog):
 
 
 _palette = []    # acik F3 penceresi (her F3 yeni pencere biriktirmesin)
+
+
+def _open_palette():
+    """Gorunur F3 penceresi ya da None (silinmis Qt nesnelerini listeden temizler)."""
+    alive = None
+    for dlg in list(_palette):
+        try:
+            if dlg.isVisible():
+                alive = dlg
+                continue
+        except RuntimeError:
+            pass        # Qt nesnesi silinmis
+        _palette.remove(dlg)
+    return alive
+
+
+def close_palette():
+    dlg = _open_palette()
+    if dlg is not None:
+        dlg.close()
+        return True
+    return False
+
+
+def palette_guard(ev, t):
+    """Orange olay filtresinden: F3 aciksa Esc ve pencere disina tiklama onu kapatir.
+
+    Pencerenin kendi odagina / WindowDeactivate olayina guvenmiyoruz: macOS'ta F3 penceresi etkin pencere
+    olamadiginda ikisi de gelmiyor ve pencere Maya kapatilana kadar ekranda kaliyordu (#7).
+    Donus: olay tuketildiyse True (yalniz Esc; disari tiklama Maya'ya gecmeye devam eder)."""
+    if not _palette:
+        return False            # en sik yol: F3 kapali, ucuz cikis
+    dlg = _open_palette()
+    if dlg is None:
+        return False
+    if t == EV_KEY_PRESS and int(ev.key()) == int(Qt.Key.Key_Escape):
+        dlg.close()
+        return True
+    if t == EV_MPRESS:
+        try:
+            pos = ev.globalPosition().toPoint() if hasattr(ev, 'globalPosition') else ev.globalPos()
+        except Exception:
+            return False
+        if not dlg.frameGeometry().contains(pos):
+            QtCore.QTimer.singleShot(0, close_palette)
+    return False
 
 
 def show_search():

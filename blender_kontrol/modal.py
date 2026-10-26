@@ -45,7 +45,7 @@ class Modal(object):
                'mi': 160934.4}
 
     def __init__(self, kind, panel, nodes=None, attr=None, axis=None, wheel_attr=None,
-                 keep_undo=False, keys=None, key_hints=None):
+                 keep_undo=False, keys=None, key_hints=None, mouse_attrs=None):
         self.kind = kind
         self.panel = panel
         self.nodes = nodes or []
@@ -54,6 +54,11 @@ class Modal(object):
         self.wheel_attr = wheel_attr
         self.keys = keys or {}              # ek tuslar: ad -> fonksiyon(dugum)
         self.key_hints = key_hints or []    # HintBar'da gosterilecek aciklamalar
+        # Tusla fareye baglanan ek ayar (Blender bevel P = profil): ad -> (attr, alt, ust, etiket).
+        # Etkinken fare yukari / asagi o ayari degistirir, ana deger (genislik) yerinde kalir.
+        self.mouse_attrs = mouse_attrs or {}
+        self.mouse_attr = None      # etkin tus adi
+        self.mouse_ref = None       # (baslangic ekran y, baslangic deger)
         self.constraint = None      # (eksen, cerceve_adi, duzlem_mi)
         self.numeric = ''
         self.expr_mode = False      # '=' ile ifade modu: harfler sayiya gider (pi, 2m, 90d...)
@@ -78,6 +83,7 @@ class Modal(object):
         self.pivots = None          # 'individual': [(bilesenler, MPoint)]
         self.frames = None
         self.soft_on = False        # soft select acik mi (baslangicta bir kez sorulur)
+        self.soft_temp = False      # soft select'i bu islem icin biz actik (bitiste kapat)
         self.grid_step = 1.0        # snap adimi (baslangicta bir kez okunur)
         self.unit_scale = 1.0       # sahne birimi / cm (sayi girisindeki 2m, 10cm icin)
         self.obj_pos = None         # obje modu: {obje: baslangic pivotu (MVector)} (_orbit_objects)
@@ -105,6 +111,11 @@ class Modal(object):
         self.center, self.pivots = self._compute_pivot()
         self.frames = self._frames()
         self.soft_on = bool(self.kind in TRANSFORMS and self.edit and cmds.softSelect(q=True, softSelectEnabled=True))
+        if not self.soft_on and self.kind in TRANSFORMS and self.edit and setting('proportional'):
+            # O ile acik proportional: Maya soft select'i yalniz bu islem boyunca ac (bitiste kapanir)
+            cmds.softSelect(edit=True, softSelectEnabled=True)
+            self.soft_temp = True
+            self.soft_on = True
         self.buckets = self._soft_buckets() if self.soft_on else None
         self.obj_pos = self._object_pivots()
         self.raw_last = QtGui.QCursor.pos()
@@ -727,6 +738,34 @@ class Modal(object):
             value = round(value * q) / q
         return value
 
+    def _mouse_attr_value(self, pos):
+        """Fareye bagli ek ayar: yukari = artar; 400 piksel tum aralik. Sayi yazilirsa o deger."""
+        attr, lo, hi, _label = self.mouse_attrs[self.mouse_attr]
+        num = self._number()
+        if num is not None:
+            return max(lo, min(hi, num))
+        ref_y, base = self.mouse_ref
+        value = base + (ref_y - pos.y()) * (hi - lo) / 400.0
+        if self._snapping():
+            q = 100.0 if self._fine() else 20.0
+            value = round(value * q) / q
+        return max(lo, min(hi, value))
+
+    def _toggle_mouse_attr(self, name):
+        """P: fareyi ek ayara bagla / genislige geri ver (Blender bevel profil modu)."""
+        self.numeric, self.fields, self.field_axis = '', None, 0
+        if self.mouse_attr == name:
+            self.mouse_attr = None
+            # genislik kaldigi yerden devam etsin (fare bu arada yer degistirdi)
+            self.base_dist = getattr(self, 'last_amount', 0.0)
+            self.start_pos = QtCore.QPointF(self.eff)
+        else:
+            attr = self.mouse_attrs[name][0]
+            self.mouse_attr = name
+            self.mouse_ref = (self.eff.y(), float(cmds.getAttr('%s.%s' % (self.nodes[0], attr))))
+        self._hint_static = None
+        self.update(force=True)
+
     # -- uygulama
     def _scale_vector(self, factor):
         if self.constraint is None:
@@ -855,6 +894,12 @@ class Modal(object):
                     cmds.setAttr('%s.%s' % (node, self.attr), amount)
                 self.last_amount = amount
                 self.last_value = '%.3f' % amount
+            elif self.kind == 'attr_dist' and self.mouse_attr:
+                attr, lo, hi, label = self.mouse_attrs[self.mouse_attr]
+                value = self._mouse_attr_value(pos)
+                for node in self.nodes:
+                    cmds.setAttr('%s.%s' % (node, attr), value)
+                self.last_value = '%s: %.2f' % (_t(label), value)
             elif self.kind == 'attr_dist':
                 value = self._dist_value(pos)
                 for node in self.nodes:
@@ -901,6 +946,9 @@ class Modal(object):
             self.base_move = om.MVector(self.fixed_axis) * getattr(self, 'last_amount', 0.0)
         elif self.kind == 'attr_dist':
             self.base_dist = getattr(self, 'last_amount', 0.0)
+            if self.mouse_attr:
+                attr = self.mouse_attrs[self.mouse_attr][0]
+                self.mouse_ref = (self.eff.y(), float(cmds.getAttr('%s.%s' % (self.nodes[0], attr))))
         self.snap_picker = None
         self._drawn = None      # kamera degisti: kisit cizgisi yeniden
         self._show()
@@ -954,7 +1002,7 @@ class Modal(object):
     def _hint_keys(self):
         """Tus listesi HTML'i; ~25 ceviri + dizgi kurulumu yalniz durum (tur, kisit, snap, soft...) degisince."""
         key = (self.kind, self.constraint, self.orientation, self.edit, self.soft_on, self.snap_on,
-               tuple(self.key_hints), bool(self.wheel_attr))
+               tuple(self.key_hints), bool(self.wheel_attr), self.mouse_attr)
         if self._hint_static is not None and self._hint_static[0] == key:
             return self._hint_static[1]
         keys = []
@@ -986,6 +1034,8 @@ class Modal(object):
 
     def _hint_html(self):
         title = _t(self.TITLES[self.kind])
+        if self.mouse_attr:
+            title += '  ·  %s' % _t(self.mouse_attrs[self.mouse_attr][3])
         if self.constraint:
             axis, frame, plane = self.constraint
             what = (_t('%s hariç düzlem') if plane else _t('%s ekseni')) % axis.upper()
@@ -1108,6 +1158,8 @@ class Modal(object):
             self._revert_for_numeric()
         elif key == int(Qt.Key.Key_Shift):
             self._show()
+        elif name in self.mouse_attrs and self.nodes and not ev.isAutoRepeat():
+            self._toggle_mouse_attr(name)
         elif name in self.keys and self.nodes:
             for node in self.nodes:
                 try:
@@ -1200,6 +1252,14 @@ class Modal(object):
                 self._wheel(steps > 0)
         return etype != EV_MMOVE
 
+    def _end_soft_temp(self):
+        if self.soft_temp:
+            self.soft_temp = False
+            try:
+                cmds.softSelect(edit=True, softSelectEnabled=False)
+            except Exception:
+                pass
+
     def finish(self, ok):
         if self.timer:
             self.timer.stop()
@@ -1236,6 +1296,7 @@ class Modal(object):
             self.chunk_open = False
             if not ok and getattr(self, 'recorded', self.dirty):
                 cmds.undo()     # modal oncesi kaydedilen olusturma (extrude dugumu vb.) da geri alinsin
+        self._end_soft_temp()
         cmds.refresh()
 
 
@@ -1276,6 +1337,9 @@ def _abort_modal(*_):
                 pass
     QtWidgets.QToolTip.hideText()
     filt.modal = None
+    end_soft = getattr(modal, '_end_soft_temp', None)
+    if end_soft is not None:
+        end_soft()      # O ile gecici acilan soft select acik kalmasin
     resume = getattr(modal, '_resume_undo', None)
     if resume is not None:
         try:

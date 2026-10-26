@@ -824,3 +824,87 @@ def test_search_palette_reject_closes():
     from blender_kontrol import search
     from blender_kontrol.compat import QtWidgets
     assert search.SearchPalette.reject is not QtWidgets.QDialog.reject
+
+
+def test_search_palette_closes_on_escape_and_outside_click(monkeypatch):
+    """#7: macOS'ta F3 penceresi etkin pencere olamayinca Esc ve disari tiklama hic ulasmiyordu. Orange'in
+    kendi olay filtresi (palette_guard) iki durumda da pencereyi kapatmali; iceri tiklama kapatmamali."""
+    from blender_kontrol import search
+    from blender_kontrol.compat import EV_KEY_PRESS, EV_MPRESS, LMB, Qt, QtCore, QtGui, QtWidgets
+
+    class FakePalette(QtWidgets.QWidget):
+        pass
+
+    def make():
+        dlg = FakePalette()
+        dlg.setGeometry(100, 100, 200, 150)
+        dlg.show()
+        search._palette[:] = [dlg]
+        return dlg
+
+    nomod = Qt.KeyboardModifier.NoModifier
+
+    def click(x, y):
+        p = QtCore.QPointF(x, y)
+        return QtGui.QMouseEvent(EV_MPRESS, p, p, p, LMB, LMB, nomod)
+
+    calls = []
+    monkeypatch.setattr(QtCore.QTimer, 'singleShot', staticmethod(lambda ms, fn: calls.append(fn) or fn()))
+
+    assert search.palette_guard(click(5, 5), EV_MPRESS) is False      # F3 kapali: dokunma
+    dlg = make()
+    inside = dlg.frameGeometry().center()
+    assert search.palette_guard(click(inside.x(), inside.y()), EV_MPRESS) is False
+    assert dlg.isVisible(), 'iceri tiklama F3 penceresini kapatmamali'
+    assert search.palette_guard(click(5, 5), EV_MPRESS) is False      # tik Maya'ya gecmeye devam eder
+    assert not dlg.isVisible(), 'disari tiklama F3 penceresini kapatmali'
+
+    dlg = make()
+    esc = QtGui.QKeyEvent(EV_KEY_PRESS, int(Qt.Key.Key_Escape), nomod)
+    assert search.palette_guard(esc, EV_KEY_PRESS) is True
+    assert not dlg.isVisible(), 'Esc F3 penceresini kapatmali'
+    other = QtGui.QKeyEvent(EV_KEY_PRESS, int(Qt.Key.Key_A), nomod, 'a')
+    assert search.palette_guard(other, EV_KEY_PRESS) is False
+    assert search._open_palette() is None
+    del search._palette[:]
+
+
+def test_search_palette_has_title_bar_on_macos(monkeypatch):
+    """macOS'ta cercevesiz arac penceresi klavye odagi alamaz: F3 orada baslikli pencere olmali."""
+    from blender_kontrol import search
+    from blender_kontrol.compat import Qt
+    monkeypatch.setattr(search, '_search_entries', lambda: [])
+    monkeypatch.setattr(search, '_main_window', lambda: None)   # sahte Maya: gercek ana pencere yok
+    for platform, frameless in (('darwin', False), ('win32', True)):
+        monkeypatch.setattr(search.sys, 'platform', platform)
+        dlg = search.SearchPalette()
+        try:
+            assert bool(dlg.windowFlags() & Qt.WindowType.FramelessWindowHint) is frameless, platform
+        finally:
+            dlg.deleteLater()
+
+
+def test_bevel_modal_uses_quad_corners_and_mouse_profile():
+    """#8: Ctrl+B kose n-gon'larini dortgenlere bolmeli; #9: P profili fareyle ayarlar (sabit adim degil)."""
+    import inspect
+    from blender_kontrol import mesh
+    src = inspect.getsource(mesh._bevel_comps)
+    assert 'subdivideNgons=True' in src
+    assert 'p' not in mesh.BEVEL_KEYS
+    attr, lo, hi, label = mesh.BEVEL_MOUSE['p']
+    assert (attr, lo, hi) == ('depth', -1.0, 1.0)
+
+
+def test_modal_mouse_attr_value_clamps_and_follows_mouse():
+    from blender_kontrol.compat import QtCore
+    from blender_kontrol.modal import Modal
+    m = Modal('attr_dist', 'panel', nodes=['n'], attr='offset', mouse_attrs={'p': ('depth', -1.0, 1.0, 'Profil')})
+    m.mouse_attr = 'p'
+    m.mouse_ref = (500.0, 0.0)
+    m._snapping = lambda: False
+    m._number = lambda: None
+    assert abs(m._mouse_attr_value(QtCore.QPointF(0, 400)) - 0.5) < 1e-9     # 100 px yukari = aralik / 4
+    assert m._mouse_attr_value(QtCore.QPointF(0, -5000)) == 1.0               # ust sinir
+    assert m._mouse_attr_value(QtCore.QPointF(0, 5000)) == -1.0               # alt sinir
+    m._number = lambda: 0.25
+    assert m._mouse_attr_value(QtCore.QPointF(0, 0)) == 0.25                   # yazilan sayi

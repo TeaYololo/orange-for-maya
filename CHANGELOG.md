@@ -1,5 +1,16 @@
 # Değişiklikler
 
+## 1.1.0 — 2026-10-26
+
+- **F3 macOS'ta kapanmıyordu (#7):** macOS'ta çerçevesiz pencere etkin pencere olamadığı için F3 penceresi klavye odağı almıyor, Esc'e ve dışarı tıklamaya tepki vermiyordu; Maya'yı kapatmak gerekiyordu. F3 penceresi macOS'ta başlıklı açılır. Ayrıca Orange'ın kendi olay filtresi F3 açıkken Esc'te ve pencere dışına tıklamada pencereyi kapatır (tüm platformlarda; dışarı tıklama Maya'ya geçmeye devam eder). Yerel macOS Maya doğrulaması henüz yapılmadı.
+- **Bevel köşeleri (#8):** Ctrl+B ile çok segmentli bevel'de köşeler tek bir n-gon ile kapanıyordu; artık Maya'nın kendi Bevel'i ve Orange Bevel modifier'ı gibi dörtgenlere bölünür (`subdivideNgons`).
+- **Bevel profili fareyle (#9):** Ctrl+B sırasında **P**, profili sabit değerler arasında atlatmak yerine fareye bağlar: fare yukarı / aşağı profili sürekli değiştirir (Shift hassas, Ctrl adımlı, sayı yazılabilir); tekrar P genişliğe döner. Maya'da profil = `depth` (-1..1).
+- **Orbit Around Selection çalışmıyordu (#9):** ayar Maya'nın `objectTumble` bayrağını açıyordu; o bayrak "imlecin altındaki objenin etrafında dön" demek ve seçimle ilgisi yok. Artık Maya'nın *tumble pivot* + *Auto-set pivot* ayarlarını açar: her seçim dönme merkezini seçimin merkezine koyar. Ayar kapatılınca Maya'nın önceki değerleri geri gelir. Maya arayüzünde elle doğrulanmadı; Maya belgelerindeki bayrak tanımlarına dayanır.
+- **Wireframe / X-Ray'de arkadakileri seçme (#6):** Blender gibi, Solid görünümde yalnız görünenler seçilir; Orange ile Wireframe'e ya da X-Ray'e geçince arkadakiler de seçilir (Maya: camera based selection, `selectPref -useDepth`). Ayarlar → Görünüm alanı'ndan kapatılabilir. Orange kaldırılınca Maya'nın önceki seçim ayarı geri yüklenir.
+- **Proportional editing Blender gibi (#9):** **O** artık Maya'nın soft select'ini sürekli açık bırakmaz; renkli etki alanı yalnız G / R / S sırasında görünür ve işlem bitince kapanır. Alan işlem sırasında tekerlekle ayarlanır.
+- **Ctrl + . origin düzenle (#9):** seçili objenin origin'i (pivot) taşıma aracının pivot düzenleme moduyla serbestçe taşınır / döndürülür; tekrar Ctrl + . normal taşımaya döner (Blender'daki *Affect Only Origins*'in karşılığı; Maya'da D / Insert).
+- Maya ayarlarını saklama / geri yükleme: Orange'ın değiştirdiği her Maya ayarı ayrı saklanır; sonradan eklenen ayarlar (seçim derinliği, tumble pivot) eski kurulumlarda da bir kez kaydedilir.
+
 ## 1.0.3 — 2026-10-25
 
 - **macOS açılış çökmesi (#4):** PySide olay filtresi artık macOS'ta uygulama geneline değil yalnızca QWidget nesnelerine kurulur. Bu, Maya'daki QtWebEngine iç QObject olaylarının Orange filtresine ulaşmasını engeller. Yeni açılan widget'lar taranarak izlemeye eklenir ve Orange kapanırken filtreler kaldırılır.

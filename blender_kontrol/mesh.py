@@ -10,6 +10,7 @@ import maya.api.OpenMaya as om
 
 from .core import _filter, _msg, _warn
 from .i18n import _t
+from .settings import set_setting, setting
 from .util import (COMP_SUFFIX, _comps, _deferred, _face_normal, _mesh_fn, _objs, _ranges, _sel, _set_world_points,
     _shape_type, popup, undoable)
 from .ui import pie
@@ -172,17 +173,20 @@ def inset_or_key():
                 key_hints=[_t('<b>I</b> tek tek (individual)')])
 
 
-BEVEL_KEYS = {'p': _cycle_attr('depth', [1.0, 0.5, 0.0, -0.5, -1.0]),
-              'm': _cycle_attr('mitering', [0, 1, 2, 3, 4]),
+BEVEL_KEYS = {'m': _cycle_attr('mitering', [0, 1, 2, 3, 4]),
               'c': _toggle_attr('chamfer')}
-BEVEL_HINTS = ['<b>P</b> profil', '<b>M</b> köşe birleşimi (miter)', '<b>C</b> chamfer']
+# Blender: P'ye basinca fare profili surekli ayarlar (tekrar P: genislige don). Maya'da profil = depth (-1..1).
+BEVEL_MOUSE = {'p': ('depth', -1.0, 1.0, 'Profil')}
+BEVEL_HINTS = ['<b>P</b> profil (fareyle)', '<b>M</b> köşe birleşimi (miter)', '<b>C</b> chamfer']
 
 
 def _bevel_comps(comps):
+    # subdivideNgons: cok segmentli bevel'de koseler tek n-gon yerine dortgenlerle kapanir (Maya'nin kendi
+    # Bevel'i ve Orange Bevel modifier'i gibi; #8).
     nodes = cmds.polyBevel3(comps, offsetAsFraction=False, offset=0.0, segments=1,
-                            mitering=0, chamfer=True)
+                            mitering=0, chamfer=True, subdivideNgons=True)
     start_modal('attr_dist', nodes=nodes, attr='offset', wheel_attr='segments',
-                keys=BEVEL_KEYS, key_hints=BEVEL_HINTS)
+                keys=BEVEL_KEYS, key_hints=BEVEL_HINTS, mouse_attrs=BEVEL_MOUSE)
 
 
 def bevel():
@@ -539,9 +543,14 @@ def normals_menu():
 
 
 def toggle_soft_select():
-    state = not cmds.softSelect(q=True, softSelectEnabled=True)
-    cmds.softSelect(edit=True, softSelectEnabled=state)
-    _msg(_t('Proportional (Soft Select): %s') % (_t('açık  -  yarıçap: B + sürükle') if state else _t('kapalı')))
+    """O: Blender proportional editing. Maya'nin soft select'i burada acilmaz: yalniz G / R / S sirasinda
+    acilir ki renkli etki alani her zaman ekranda kalmasin (Blender gibi; #9). Alan: islem sirasinda tekerlek."""
+    state = not (setting('proportional') or cmds.softSelect(q=True, softSelectEnabled=True))
+    set_setting('proportional', state)
+    if cmds.softSelect(q=True, softSelectEnabled=True):
+        cmds.softSelect(edit=True, softSelectEnabled=False)
+    _msg(_t('Proportional editing: %s') % (_t('açık  -  G / R / S sırasında tekerlek: alan') if state
+                                           else _t('kapalı')))
 
 
 # ---------------------------------------------------------------- 2. asama komutlari

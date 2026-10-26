@@ -106,6 +106,29 @@ def reset_scale():
     _reset('scale', 1)
 
 
+MOVE_TOOLS = ('moveSuperContext', 'RotateSuperContext', 'scaleSuperContext')
+
+
+def toggle_origin_edit():
+    """Ctrl+.: objenin origin'ini (pivot) serbestce tasi. Blender'daki "Affect Only Origins"in Maya karsiligi:
+    tasima aracinin pivot duzenleme modu (Maya'da D / Insert). Pivot gorunur, manipulator yalniz onu tasir;
+    tekrar Ctrl+. ile normal tasimaya don (#9)."""
+    if not _objs() and cmds.currentCtx() not in MOVE_TOOLS:
+        _msg(_t('Origin düzenlemek için bir obje seç'))
+        return
+    if cmds.currentCtx() not in MOVE_TOOLS:
+        cmds.setToolTo('moveSuperContext')
+    mel.eval('ctxEditMode')
+    try:
+        editing = bool(mel.eval('manipMoveContext -q -editPivotMode Move'))
+    except Exception:
+        editing = None
+    if editing is False:
+        _msg(_t('Origin düzenleme kapalı'))
+    else:
+        _msg(_t('Origin düzenleme: manipülatörle pivotu taşı / döndür  ·  bitince tekrar Ctrl+.'))
+
+
 def apply_menu():
     def freeze(t, r, s):
         objs = _objs()

@@ -57,6 +57,7 @@ X/Y/Z eksen (2. kez global/lokal, 3. kez kapalı) · Shift+X/Y/Z düzlem · C k�
 Alt + orta tuş ile gezin · Shift hassas · Ctrl snap (Shift+Ctrl ince) · Shift+Tab snap aç/kapa · G/R/S arası geçiş · G G kaydır (edit modu) · R R serbest döndür ·
 tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işaret çevirir, Tab sonraki eksen (G 1 Tab 2 Enter), = ifade modu (2m, 90d, pi/2)</td></tr>
 <tr><td><b>.</b> / <b>,</b></td><td>Pivot pie (orta nokta / sınır kutusu / 3D imleç / aktif / tek tek) / oryantasyon pie (global / lokal / normal / görünüm / imleç / ebeveyn)</td></tr>
+<tr><td><b>Ctrl + .</b></td><td>Origin düzenle: pivotu manipülatörle serbest taşı / döndür (tekrar Ctrl + . ile bitir)</td></tr>
 <tr><td><b>Shift + Tab</b> / Shift + Ctrl + Tab</td><td>Snap aç/kapa / snap hedefi (artım, köşe, kenar, yüz). İşlem sırasında Ctrl geçici olarak tersine çevirir</td></tr>
 <tr><td><b>Alt + G / R / S</b></td><td>Konum / döndürme / ölçeği sıfırla</td></tr>
 <tr><td><b>Ctrl + A</b></td><td>Uygula (freeze), modifier'ları uygula, geçmişi temizle, instance'ları gerçek yap</td></tr>
@@ -73,7 +74,7 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>Shift + G</b></td><td>Grupla seç (çocuklar, ebeveyn, kardeşler, tür, layer); edit modunda benzerini seç</td></tr>
 <tr><td><b>Shift + S</b></td><td>Hizala pie: imleç/seçim → seçim/imleç/grid/orijin/aktif, pivot → imleç</td></tr>
 <tr><td><b>Ctrl + 0..5</b></td><td>Canlı Subdivision modifier seviyesi</td></tr>
-<tr><td><b>O</b> / Shift + O / Alt + O</td><td>Proportional editing / falloff pie / sadece bağlı parçalar</td></tr>
+<tr><td><b>O</b> / Shift + O / Alt + O</td><td>Proportional editing (etki alanı yalnız G / R / S sırasında görünür, tekerlek: alan) / falloff pie / sadece bağlı parçalar</td></tr>
 <tr><td><b>B</b> / <b>W</b> / <b>C</b></td><td>Kutu seçimi / seçim aracı döngüsü (kutu, kement, fırça) / fırça ile seçim (C, sağ tık ya da Esc ile çık)</td></tr>
 <tr><td><b>Shift + R</b></td><td>Son işlemi tekrarla</td></tr>
 </table>
@@ -87,7 +88,7 @@ tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işa
 <tr><td><b>Shift + A</b> (edit modu)</td><td>Primitifi düzenlenen mesh'e ekle</td></tr>
 <tr><td><b>E</b> / Alt + E</td><td>Kenar ya da yüz extrude (yüz: normal boyunca; X/Y/Z eksene kilitle, G serbest taşı) / extrude menüsü (normaller boyunca, tek tek, kenar). Köşe extrude yok: Maya mesh'inde yüzü olmayan kenar olamaz</td></tr>
 <tr><td><b>I</b></td><td>Inset (I tekrar: tek tek)</td></tr>
-<tr><td><b>Ctrl + B</b> / Shift + Ctrl + B</td><td>Bevel / köşe bevel (tekerlek: segment, P profil, M miter, C chamfer)</td></tr>
+<tr><td><b>Ctrl + B</b> / Shift + Ctrl + B</td><td>Bevel / köşe bevel (tekerlek: segment, P: profili fareyle ayarla, M miter, C chamfer)</td></tr>
 <tr><td><b>Ctrl + R</b> / Ctrl + Shift + R</td><td>Loop cut: kenarın üzerine gel, tekerlek kesim sayısı, tıkla, kaydır (birden çok kesim birlikte kayar), tıkla / ofset kenar halkası</td></tr>
 <tr><td><b>V</b></td><td>Rip (ayır ve taşı)</td></tr>
 <tr><td><b>G G</b> / Shift + V</td><td>Kenar kaydır (kenar/yüz modu: komşu kenarlar boyunca, iki yöne; E eşit mesafe, F çevir) / köşe kaydır (fare yönündeki kenar boyunca). Sayı yaz, Ctrl adımlı, Shift hassas</td></tr>

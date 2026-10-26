@@ -36,7 +36,8 @@ from .mesh import (bevel, bevel_vertices, collapse, connect_verts, crease_edges,
     vertex_menu)
 from .objects import (add_menu, alt_s, apply_menu, batch_rename, boolean, clear_parent_menu, collection_menu,
     ctrl_l, duplicate, hide_selected, hide_unselected, instance, join, new_layer_from_selection, parent_menu,
-    rename_active, reset_location, reset_rotation, set_origin, set_origin_menu, transfer_mode, unhide_all)
+    rename_active, reset_location, reset_rotation, set_origin, set_origin_menu, toggle_origin_edit, transfer_mode,
+    unhide_all)
 from .modes import SCULPT_BRUSHES, mode_pie, sculpt_brush, sculpt_radius
 from .uv import (uv_pin, uv_select_all, uv_select_linked, uv_select_mode, uv_snap_menu, uv_split, uv_stitch,
     uv_modal, uv_transform_tool)
@@ -168,6 +169,7 @@ BINDINGS = {
     'ctrl+b': _b(V, _with_chunk(bevel), raw=True, title='Bevel'),
     'ctrl+shift+b': _b(V, _with_chunk(bevel_vertices), raw=True, title='Köşe bevel'),
     'period': _b(V, pivot_pie, raw=True, title='Pivot noktası pie'),
+    'ctrl+period': _b(V, toggle_origin_edit, undo=False, title='Origin düzenle (pivotu serbest taşı)'),
     'comma': _b(V, orientation_pie, raw=True, title='Dönüşüm oryantasyonu pie'),
     'shift+tab': _b(V, toggle_snap, undo=False, title='Snap aç/kapa'),
     'ctrl+shift+tab': _b(V, snap_target_menu, raw=True, title='Snap hedefi (artım/köşe/kenar/yüz)'),
