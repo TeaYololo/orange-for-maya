@@ -1,5 +1,11 @@
 # Değişiklikler
 
+## 1.2.0 — 2026-10-28
+
+- **Array döndürme ve ölçek (#11):** Array kartında **Döndürme (kopya başına)** ve **Ölçek (kopya başına)** alanları: her kopya bir öncekine göre bu kadar döner / ölçeklenir (Maya'nın Duplicate Special'ı gibi; Göreli / Sabit konumla birleşir, örneğin dairesel dizi). Sahnede yeni obje oluşturulmaz: Maya'nın yerleşik `composeMatrix` düğümü Array'in Object Offset matrisini verir; ayrıca bir ofset objesi seçilirse ikisi birleşir. Değerler sıfır / 1'e dönünce yardımcı düğüm silinir, Array kaldırılınca da kalmaz.
+- **Origin noktası (#9):** seçili objelerin (edit modunda düzenlenen objenin) origin'i Maya'nın pivot göstergesiyle işaretlenir, seçim kalkınca kapanır. Undo'ya girmez, sahneyi "değişti" yapmaz, kullanıcının kendi açtığı pivot göstergelerine dokunmaz. Ayarlar → Görünüm alanı'ndan kapatılabilir.
+- **F obje modunda seçime odaklanır (#9):** Blender'da obje modunda F boş; Maya'daki gibi kamera seçime yaklaşır ve dönme merkezi seçim olur (numpad'i olmayanlar için; Numpad . de aynı işi yapar). Edit modunda F doldurmaya devam eder.
+
 ## 1.1.0 — 2026-10-26
 
 - **F3 macOS'ta kapanmıyordu (#7):** macOS'ta çerçevesiz pencere etkin pencere olamadığı için F3 penceresi klavye odağı almıyor, Esc'e ve dışarı tıklamaya tepki vermiyordu; Maya'yı kapatmak gerekiyordu. F3 penceresi macOS'ta başlıklı açılır. Ayrıca Orange'ın kendi olay filtresi F3 açıkken Esc'te ve pencere dışına tıklamada pencereyi kapatır (tüm platformlarda; dışarı tıklama Maya'ya geçmeye devam eder). Yerel macOS Maya doğrulaması henüz yapılmadı.

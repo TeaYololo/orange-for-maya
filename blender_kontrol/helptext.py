@@ -58,6 +58,7 @@ Alt + orta tuş ile gezin · Shift hassas · Ctrl snap (Shift+Ctrl ince) · Shif
 tekerlek/PageUp proportional alanı · sayı ya da işlem yaz (ör. 2*3), - işaret çevirir, Tab sonraki eksen (G 1 Tab 2 Enter), = ifade modu (2m, 90d, pi/2)</td></tr>
 <tr><td><b>.</b> / <b>,</b></td><td>Pivot pie (orta nokta / sınır kutusu / 3D imleç / aktif / tek tek) / oryantasyon pie (global / lokal / normal / görünüm / imleç / ebeveyn)</td></tr>
 <tr><td><b>Ctrl + .</b></td><td>Origin düzenle: pivotu manipülatörle serbest taşı / döndür (tekrar Ctrl + . ile bitir)</td></tr>
+<tr><td><b>F</b> (obje modu) / Numpad .</td><td>Seçime odaklan: kamera seçime yaklaşır, dönme merkezi seçim olur</td></tr>
 <tr><td><b>Shift + Tab</b> / Shift + Ctrl + Tab</td><td>Snap aç/kapa / snap hedefi (artım, köşe, kenar, yüz). İşlem sırasında Ctrl geçici olarak tersine çevirir</td></tr>
 <tr><td><b>Alt + G / R / S</b></td><td>Konum / döndürme / ölçeği sıfırla</td></tr>
 <tr><td><b>Ctrl + A</b></td><td>Uygula (freeze), modifier'ları uygula, geçmişi temizle, instance'ları gerçek yap</td></tr>

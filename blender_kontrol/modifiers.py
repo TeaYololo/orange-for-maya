@@ -756,17 +756,84 @@ def add_array(base, count=3, axis='x', gap=0.0, relative=None, constant=None):
     return node
 
 
-def array_object_offset(node):
-    """Array dugumune bagli Object Offset transform'u (tam yol) ya da ''."""
+# Array dondurme / olcek (#11): her kopya bir oncekine gore bu kadar doner / olceklenir (Maya Duplicate
+# Special gibi). Blender'da bu Object Offset ile yapilir; burada sahnede obje olusturmadan, Maya'nin yerlesik
+# composeMatrix dugumu Array'in Object Offset matrisini verir. Kullanici ayrica bir ofset objesi secerse
+# ikisi multMatrix ile birlesir. Dugum (C++ / Python eklentisi) degismez.
+ARRAY_STEP_TAG = 'orangeArrayStep'      # composeMatrix / multMatrix uzerinde: sahibi Array dugumu
+
+
+def _array_offset_sources(node):
+    """(dondurme/olcek composeMatrix'i ya da None, ofset transform'u tam yol ya da '', multMatrix ya da None)."""
     linked = cmds.listConnections(node + '.objectWorldMatrix', source=True, destination=False, plugs=True) or []
     if not linked:
-        return ''
-    return (cmds.ls(linked[0].split('.worldMatrix', 1)[0], long=True) or [''])[0]
+        return None, '', None
+    src_node = linked[0].split('.', 1)[0]
+    kind = cmds.nodeType(src_node)
+    if kind == 'composeMatrix':
+        return src_node, '', None
+    if kind == 'multMatrix':
+        compose, transform = None, ''
+        for plug in cmds.listConnections(src_node + '.matrixIn', source=True, destination=False, plugs=True) or []:
+            owner = plug.split('.', 1)[0]
+            if cmds.nodeType(owner) == 'composeMatrix':
+                compose = owner
+            elif '.worldMatrix' in plug:
+                transform = (cmds.ls(plug.split('.worldMatrix', 1)[0], long=True) or [''])[0]
+        return compose, transform, src_node
+    return None, (cmds.ls(linked[0].split('.worldMatrix', 1)[0], long=True) or [''])[0], None
+
+
+def array_object_offset(node):
+    """Array dugumune bagli Object Offset transform'u (tam yol) ya da ''."""
+    return _array_offset_sources(node)[1]
+
+
+def array_step_transform(node):
+    """(dondurme derece [x, y, z], olcek [x, y, z]): kopyadan kopyaya."""
+    compose = _array_offset_sources(node)[0]
+    if not compose:
+        return [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
+    return (list(cmds.getAttr(compose + '.inputRotate')[0]), list(cmds.getAttr(compose + '.inputScale')[0]))
 
 
 def _disconnect_sources(plug):
     for source in cmds.listConnections(plug, source=True, destination=False, plugs=True) or []:
         cmds.disconnectAttr(source, plug)
+
+
+def _tag_step_node(helper, node):
+    if not cmds.attributeQuery(ARRAY_STEP_TAG, node=helper, exists=True):
+        cmds.addAttr(helper, longName=ARRAY_STEP_TAG, dataType='string')
+    cmds.setAttr(helper + '.' + ARRAY_STEP_TAG, node, type='string')
+
+
+def _wire_array_offset(node, base, transform, compose):
+    """Object Offset girdisini kur: transform ve / veya dondurme-olcek matrisi."""
+    _old_compose, _old_transform, old_mult = _array_offset_sources(node)
+    _disconnect_sources(node + '.objectWorldMatrix')
+    _disconnect_sources(node + '.baseInverseMatrix')
+    if old_mult and cmds.objExists(old_mult):
+        # Once girdileri kopar: Maya, silinen dugume tek baglantisi olan composeMatrix'i de birlikte siliyor
+        pairs = cmds.listConnections(old_mult, source=True, destination=False, plugs=True, connections=True) or []
+        for dst, src in zip(pairs[0::2], pairs[1::2]):
+            cmds.disconnectAttr(src, dst)
+        cmds.delete(old_mult)
+    if transform and compose:
+        mult = cmds.createNode('multMatrix', name=node.split('|')[-1] + '_offsetMult', skipSelect=True)
+        _tag_step_node(mult, node)
+        cmds.connectAttr(compose + '.outputMatrix', mult + '.matrixIn[0]', force=True)
+        cmds.connectAttr(transform + '.worldMatrix[0]', mult + '.matrixIn[1]', force=True)
+        cmds.connectAttr(mult + '.matrixSum', node + '.objectWorldMatrix', force=True)
+    elif transform:
+        cmds.connectAttr(transform + '.worldMatrix[0]', node + '.objectWorldMatrix', force=True)
+    elif compose:
+        # Yalniz dondurme / olcek: matris tabanin obje uzayinda; baseInverseMatrix bos kalir (birim matris), bu
+        # yuzden obje tasinirken dizi her karede yeniden hesaplanmaz.
+        cmds.connectAttr(compose + '.outputMatrix', node + '.objectWorldMatrix', force=True)
+    if transform:
+        cmds.connectAttr(base + '.worldInverseMatrix[0]', node + '.baseInverseMatrix', force=True)
+    cmds.setAttr(node + '.useObjectOffset', bool(transform or compose))
 
 
 def set_array_object_offset(node, base, transform=None):
@@ -777,20 +844,38 @@ def set_array_object_offset(node, base, transform=None):
         descendants = set(cmds.listRelatives(base, allDescendents=True, fullPath=True) or [])
         if not transform or transform == base or transform in descendants:
             raise RuntimeError(_t('Obje ofseti (Object Offset) farklı ve bu objenin altında olmayan bir transform olmalı'))
-        source = transform + '.worldMatrix[0]'
-        existing = cmds.listConnections(node + '.objectWorldMatrix', source=True, destination=False, plugs=True) or []
-        if existing and existing != [source]:
-            cmds.disconnectAttr(existing[0], node + '.objectWorldMatrix')
-        if not existing or existing != [source]:
-            cmds.connectAttr(source, node + '.objectWorldMatrix', force=True)
-        inverse = base + '.worldInverseMatrix[0]'
-        if (cmds.listConnections(node + '.baseInverseMatrix', source=True, destination=False, plugs=True) or []) != [inverse]:
-            cmds.connectAttr(inverse, node + '.baseInverseMatrix', force=True)
-        cmds.setAttr(node + '.useObjectOffset', True)
-    else:
-        _disconnect_sources(node + '.objectWorldMatrix')
-        _disconnect_sources(node + '.baseInverseMatrix')
-        cmds.setAttr(node + '.useObjectOffset', False)
+    compose = _array_offset_sources(node)[0]
+    _wire_array_offset(node, base, transform or '', compose)
+
+
+def set_array_step_transform(node, base, rotation=None, scale=None):
+    """Kopyadan kopyaya dondurme (derece) ve olcek. Birim degerlerde yardimci dugum silinir."""
+    base = (cmds.ls(base, long=True) or [base])[0]
+    old_rot, old_scale = array_step_transform(node)
+    rotation = [float(v) for v in (old_rot if rotation is None else rotation)]
+    scale = [float(v) for v in (old_scale if scale is None else scale)]
+    compose, transform, _mult = _array_offset_sources(node)
+    identity = all(abs(v) < 1e-9 for v in rotation) and all(abs(v - 1.0) < 1e-9 for v in scale)
+    if identity:
+        if compose:
+            _wire_array_offset(node, base, transform, None)
+            if cmds.objExists(compose):
+                cmds.delete(compose)
+        return
+    if not compose:
+        compose = cmds.createNode('composeMatrix', name=node.split('|')[-1] + '_step', skipSelect=True)
+        _tag_step_node(compose, node)
+        _wire_array_offset(node, base, transform, compose)
+    cmds.setAttr(compose + '.inputRotate', *rotation)
+    cmds.setAttr(compose + '.inputScale', *scale)
+
+
+def _delete_array_step_nodes(node):
+    """Array kaldirilinca yardimci composeMatrix / multMatrix sahnede yetim kalmasin."""
+    compose, _transform, mult = _array_offset_sources(node)
+    for helper in (mult, compose):
+        if helper and cmds.objExists(helper):
+            cmds.delete(helper)
 
 
 def remove_array(base):
@@ -1012,6 +1097,8 @@ def is_enabled(node):
 
 
 def remove_history_modifier(node):
+    if cmds.objExists(node) and kind_of(node) == 'array':
+        _delete_array_step_nodes(node)
     if cmds.objExists(node):
         upstream = cmds.listConnections(node_input_plug(node), source=True, destination=False, plugs=True) or []
         downstream = cmds.listConnections(node_output_plug(node), source=False, destination=True, plugs=True) or []
@@ -2118,6 +2205,11 @@ class ModifierPanel(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 offset_row.addWidget(offset_name, 1)
                 offset_row.addWidget(use_selected)
                 offset_row.addWidget(clear_offset)
+                step_rotation, step_scale = array_step_transform(node)
+                rotation = self._triple(step_rotation, lambda vals, n=node, b=base: self._run(
+                    lambda: set_array_step_transform(n, b, rotation=vals), False), low=-360.0, high=360.0)
+                scale = self._triple(step_scale, lambda vals, n=node, b=base: self._run(
+                    lambda: set_array_step_transform(n, b, scale=vals), False), low=0.001, high=1000.0)
                 merge = QtWidgets.QCheckBox(_t('Kopyaları birleştir (Merge Copies)'))
                 merge.setChecked(bool(cmds.getAttr(node + '.mergeCopies')))
                 merge.toggled.connect(lambda value, n=node: self._run(
@@ -2129,7 +2221,9 @@ class ModifierPanel(MayaQWidgetDockableMixin, QtWidgets.QDialog):
                 merge_distance.valueChanged.connect(lambda value, n=node: self._run(
                     lambda: cmds.setAttr(n + '.mergeDistance', value), False))
                 widgets.append(self._form([(_t('Kopya Sayısı'), count), (_t('Göreli Konum'), relative),
-                                           (_t('Sabit Konum'), constant), (_t('Obje ofseti (Object Offset)'), offset),
+                                           (_t('Sabit Konum'), constant), (_t('Döndürme (kopya başına)'), rotation),
+                                           (_t('Ölçek (kopya başına)'), scale),
+                                           (_t('Obje ofseti (Object Offset)'), offset),
                                            (_t('Birleştirme mesafesi (Merge Distance)'), merge_distance)]))
                 widgets.append(merge)
                 row_node = node

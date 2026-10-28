@@ -29,7 +29,8 @@ from .selection import (box_select_tool, circle_select_toggle, ctrl_number, cycl
     shrink_selection)
 from . import interop, modifiers
 from .mesh import (bevel, bevel_vertices, collapse, connect_verts, crease_edges, delete_by_mode, delete_menu,
-    dissolve, edge_menu, extrude, extrude_menu, face_menu, falloff_pie, fill, fill_beauty, inset_or_key, knife,
+    dissolve, edge_menu, extrude, extrude_menu, face_menu, falloff_pie, fill_beauty, fill_or_frame, inset_or_key,
+    knife,
     limited_dissolve, merge_menu, mesh_mirror_menu, normals_menu, quadrangulate, recalc_normals,
     grid_fill, recalc_normals_inside, rip, separate_by_material, separate_menu, shade_flat, shade_smooth, split_menu,
     split_selection, to_sphere, toggle_soft_connected, toggle_soft_select, triangulate, uv_menu, uv_unwrap,
@@ -176,7 +177,7 @@ BINDINGS = {
     'ctrl+r': _b(V, loop_cut, raw=True, title='Loop cut'),
     'ctrl+shift+r': _b(V, lambda: mel.eval('OffsetEdgeLoopTool'), undo=False, title='Ofset kenar halkası'),
     'k': _b(V, knife, undo=False, title='Bıçak (Knife / Multi-Cut)'),
-    'f': _b(V, fill, title='Yüz/kenar doldur (Fill)'),
+    'f': _b(V, fill_or_frame, panel=True, title='Doldur (edit modu) / seçime odaklan (obje modu)'),
     'alt+f': _b(V, fill_beauty, title='Doldur ve üçgenle (Fill)'),
     'j': _b(V, connect_verts, title='Köşeleri bağla (Connect)'),
     'l': _b(V, select_linked_under_cursor, title='Bağlı olanları seç (imleç altı)'),

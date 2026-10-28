@@ -1519,6 +1519,79 @@ def test_issue_fixes_1_1():
     cmds.file(new=True, force=True)
 
 
+def test_issue_fixes_1_2():
+    """1.2.0: #11 Array dondurme / olcek, #9 origin noktasi ve obje modunda F."""
+    mods = bk.modifiers
+
+    def bbox(node):
+        return [round(v, 3) for v in cmds.exactWorldBoundingBox(node)]
+
+    # #11: kopya basina dondurme / olcek gercekten geometriyi degistirir, birim degerde yardimci silinir
+    cmds.file(new=True, force=True)
+    cube = cmds.polyCube(name='arrCube')[0]
+    node = mods.add_array(cube, 4, 'x')
+    straight = bbox(cube)
+    mods.set_array_step_transform(node, cube, rotation=[0.0, 30.0, 0.0])
+    rotated = bbox(cube)
+    ok('#11 Array dondurme sekli degistirir', rotated != straight, (straight, rotated))
+    ok('#11 dondurme okunur', [round(v, 3) for v in mods.array_step_transform(node)[0]] == [0.0, 30.0, 0.0])
+    ok('#11 Object Offset acik', bool(cmds.getAttr(node + '.useObjectOffset')))
+    mods.set_array_step_transform(node, cube, scale=[0.8, 0.8, 0.8])
+    ok('#11 olcek okunur', [round(v, 3) for v in mods.array_step_transform(node)[1]] == [0.8, 0.8, 0.8])
+    ok('#11 olcek sekli degistirir', bbox(cube) != rotated)
+    ok('#11 sahnede yeni transform yok', cmds.ls(type='transform') == cmds.ls(['persp', 'top', 'front', 'side', cube],
+                                                                          type='transform') or
+       not [t for t in cmds.ls(type='transform', long=True) if 'arrCube' not in t and t.split('|')[-1] not in
+            ('persp', 'top', 'front', 'side')])
+
+    # kullanicinin ofset objesiyle birlikte
+    loc = cmds.spaceLocator(name='arrOffset')[0]
+    cmds.setAttr(loc + '.tx', 0.5)
+    mods.set_array_object_offset(node, cube, loc)
+    compose, transform, mult = mods._array_offset_sources(node)
+    ok('#11 ofset objesi + dondurme birlikte (multMatrix)', bool(compose and mult) and transform.endswith('arrOffset'))
+    ok('#11 ofset objesi okunur', mods.array_object_offset(node).endswith('arrOffset'))
+    mods.set_array_object_offset(node, cube, None)
+    compose, transform, mult = mods._array_offset_sources(node)
+    ok('#11 ofset objesi kaldirilinca dondurme kalir', bool(compose) and not transform and not mult
+       and not cmds.ls(type='multMatrix'))
+    mods.set_array_step_transform(node, cube, rotation=[0.0, 0.0, 0.0], scale=[1.0, 1.0, 1.0])
+    ok('#11 birim degerde yardimci dugum silinir', not cmds.ls(type='composeMatrix')
+       and not cmds.getAttr(node + '.useObjectOffset'))
+    ok('#11 birim degerde sekil eskisi gibi', bbox(cube) == straight, (straight, bbox(cube)))
+    mods.set_array_step_transform(node, cube, rotation=[0.0, 45.0, 0.0])
+    mods.remove_history_modifier(node)
+    ok('#11 Array kaldirilinca yardimci dugum kalmaz', not cmds.ls(type='composeMatrix') and not cmds.ls(type='multMatrix'))
+
+    # #9: origin noktasi secili objelerde gorunur, secim kalkinca kapanir; undo / sahne degisti etkilenmez
+    cmds.file(new=True, force=True)
+    a = cmds.polyCube(name='dotA')[0]
+    b = cmds.polyCube(name='dotB')[0]
+    cmds.setAttr(b + '.displayRotatePivot', True)       # kullanicinin kendi actigi
+    cmds.file(modified=False)
+    bk.set_setting('origin_dots', 1)
+    cmds.select(a, b)
+    bk.cursor.update_origin_dots()
+    ok('#9 secili objenin origin noktasi gorunur', cmds.getAttr(a + '.displayRotatePivot'))
+    ok('#9 origin noktasi sahneyi degisti yapmaz', not cmds.file(q=True, modified=True))
+    cmds.select(clear=True)
+    bk.cursor.update_origin_dots()
+    ok('#9 secim kalkinca origin noktasi kapanir', not cmds.getAttr(a + '.displayRotatePivot'))
+    ok('#9 kullanicinin actigi pivot gostergesine dokunulmaz', cmds.getAttr(b + '.displayRotatePivot'))
+    cmds.select(a)
+    bk.cursor.update_origin_dots()
+    bk.set_setting('origin_dots', 0)
+    bk.cursor.update_origin_dots()      # onceki testler modulleri yeniden yukluyor: bu modulun durumuyla calistir
+    ok('#9 ayar kapaninca origin noktasi kapanir', not cmds.getAttr(a + '.displayRotatePivot'))
+    bk.set_setting('origin_dots', 1)
+    bk.cursor.clear_origin_dots()
+
+    # #9: F obje modunda secime odaklanir, edit modunda doldurur
+    binding = bk.BINDINGS['f']
+    ok('#9 F obje modunda secime odaklan', binding['fn'] is bk.mesh.fill_or_frame and binding['panel'])
+    cmds.file(new=True, force=True)
+
+
 def main():
     for fn in (test_i18n, test_keys, test_parse, test_mesh_helpers, test_selection_ops, test_mesh_ops, test_fill_corner, test_startup_guard, test_update_proxies,
                test_keymap_and_settings, test_grid_fill, test_modifiers, test_review_fixes, test_perf_fixes, test_modifier_fixes, test_update_fixes, test_blender_primitives,
@@ -1526,6 +1599,7 @@ def main():
                test_fbx_roundtrip,
                test_vp2_overlay,
                test_issue_fixes_1_1,
+               test_issue_fixes_1_2,
                test_installer):
         try:
             fn()

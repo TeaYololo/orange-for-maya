@@ -30,6 +30,8 @@ SETTINGS = {
     # O: proportional editing. Maya'nin soft select'i yalniz G / R / S sirasinda acilir (renkli alan
     # surekli gorunmez, Blender gibi; #9)
     'proportional': ('bk_proportional', 0),
+    # Blender: secili objelerin origin'i noktayla gorunur (Maya: displayRotatePivot; #9)
+    'origin_dots': ('bk_originDots', 1),
 }
 
 PIVOT_NAMES = {'median': 'orta nokta', 'bbox': 'sınır kutusu', 'cursor': '3D imleç',
@@ -69,6 +71,9 @@ def set_setting(name, value):
     (_state.get('setting_cache') or {}).pop(name, None)
     if name in ('zoom_to_mouse', 'orbit_selection'):
         _apply_camera_settings()
+    if name == 'origin_dots':
+        from .cursor import update_origin_dots  # dongusel import: cagri aninda
+        update_origin_dots()
     if name == 'language':
         _state['lang'] = None
         del _search_cache[:]

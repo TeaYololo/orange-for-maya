@@ -16,7 +16,7 @@ from .settings import set_setting, setting
 from .i18n import _t
 from .ui import _hint_bar, shutdown_overlay, shutdown_ui
 from .mayaprefs import _apply_camera_settings, _restore_maya_defaults, _save_maya_defaults
-from .cursor import CURSOR, _deselect_cursor, _style_cursor
+from .cursor import CURSOR, _deselect_cursor, _style_cursor, clear_origin_dots, update_origin_dots
 from .pivot import set_snap_target
 from .modal import _abort_modal, _on_app_state
 from .helptext import show_help
@@ -189,6 +189,7 @@ def _install_rest(app, filt, quiet):
             pass   # bu Maya surumunde olmayan olay
     try:
         jobs.append(cmds.scriptJob(event=['SelectionChanged', _deselect_cursor]))
+        jobs.append(cmds.scriptJob(event=['SelectionChanged', update_origin_dots]))
     except Exception:
         pass
     setattr(sys.modules['__main__'], _JOB_KEY, jobs)
@@ -248,6 +249,7 @@ def uninstall(quiet=False):
     filt.deleteLater()
     delattr(sys.modules['__main__'], _KEY)
     _kill_old_cursor_job()
+    clear_origin_dots()
     for w in _hint_bar:
         try:
             w.hide()

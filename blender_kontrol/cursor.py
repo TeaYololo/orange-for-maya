@@ -5,7 +5,8 @@ from __future__ import absolute_import, division, print_function
 import maya.cmds as cmds
 import maya.api.OpenMaya as om
 
-from .settings import setting
+from .core import _state
+from .settings import cached_setting, setting
 from .i18n import _t
 from .util import _NoUndo, _axes_euler, _click_panel, _objs, _sel
 from .ui import pie
@@ -76,6 +77,56 @@ def _deselect_cursor(*_):
                 cmds.select([n for n in cmds.ls(CURSOR, dag=True) or []], deselect=True)
     except Exception:
         pass
+
+
+def _origin_targets():
+    """Origin'i gosterilecek transform'lar: secili objeler ve edit modunda duzenlenenler (hilite)."""
+    out = set()
+    for node in (cmds.ls(sl=True, objectsOnly=True, long=True) or []) + (cmds.ls(hilite=True, long=True) or []):
+        if cmds.nodeType(node) != 'transform':
+            node = (cmds.listRelatives(node, parent=True, fullPath=True) or [None])[0]
+        if node and cmds.nodeType(node) == 'transform' and not node.split('|')[-1].startswith(CURSOR):
+            out.add(node)
+    return out
+
+
+def update_origin_dots(*_):
+    """SelectionChanged: secili objelerin pivotunu goster (Blender'daki origin noktasi; #9).
+    Yalniz bizim actiklarimizi kapatir (kullanicinin kendi actigi pivot gostergesine dokunmaz); undo'ya
+    girmez ve sahneyi 'degisti' yapmaz."""
+    ours = _state.setdefault('origin_dots', set())
+    want = _origin_targets() if cached_setting('origin_dots') else set()
+    if not want and not ours:
+        return
+    try:
+        modified = cmds.file(q=True, modified=True)
+        with _NoUndo():
+            for node in list(ours - want):
+                ours.discard(node)
+                if cmds.objExists(node):
+                    cmds.setAttr(node + '.displayRotatePivot', False)
+            for node in want - ours:
+                if cmds.objExists(node) and not cmds.getAttr(node + '.displayRotatePivot'):
+                    cmds.setAttr(node + '.displayRotatePivot', True)
+                    ours.add(node)
+        cmds.file(modified=modified)
+    except Exception:
+        pass
+
+
+def clear_origin_dots():
+    """Orange kapanirken: actigimiz pivot gostergelerini kapat."""
+    ours = _state.setdefault('origin_dots', set())
+    try:
+        modified = cmds.file(q=True, modified=True)
+        with _NoUndo():
+            for node in list(ours):
+                if cmds.objExists(node):
+                    cmds.setAttr(node + '.displayRotatePivot', False)
+        cmds.file(modified=modified)
+    except Exception:
+        pass
+    ours.clear()
 
 
 def cursor_node(create=True):

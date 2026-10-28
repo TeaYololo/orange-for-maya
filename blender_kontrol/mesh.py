@@ -364,6 +364,16 @@ def _fill_edges(edges):
         cmds.polyCloseBorder(edges)
 
 
+def fill_or_frame(panel):
+    """F: edit modunda doldur (Blender); obje modunda Blender'da F bos, Maya'daki gibi secime odaklan
+    (kamera yaklasir ve donme merkezi secim olur; numpad'i olmayanlar icin, #9)."""
+    from .view import frame_selected  # dongusel import: cagri aninda
+    if in_edit():
+        fill()
+    else:
+        frame_selected(panel)
+
+
 def fill():
     if _comps('edge'):
         _fill_edges(_comps('edge'))

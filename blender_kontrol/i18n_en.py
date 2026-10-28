@@ -420,6 +420,12 @@ EN = {
     '<b>Orta tuş</b> otomatik eksen (Shift: düzlem)': '<b>MMB</b> auto axis (Shift: plane)',
     '<b>P</b> profil': '<b>P</b> profile',
     '<b>P</b> profil (fareyle)': '<b>P</b> profile (mouse)',
+    'Döndürme (kopya başına)': 'Rotation (per copy)',
+    'Ölçek (kopya başına)': 'Scale (per copy)',
+    'Doldur (edit modu) / seçime odaklan (obje modu)': 'Fill (edit mode) / frame selected (object mode)',
+    'Seçili objelerin origin noktasını göster': 'Show the origin of selected objects',
+    "Blender gibi seçili objelerin (edit modunda düzenlenen objenin) origin'i işaretlenir (Maya: pivot göstergesi).":
+        'Like Blender, marks the origin of selected objects (and of the object in edit mode) (Maya: pivot display).',
     'Profil': 'Profile',
     'Komut ara (F3)': 'Search (F3)',
     'Origin düzenle (pivotu serbest taşı)': 'Edit origin (move the pivot freely)',
@@ -1022,6 +1028,7 @@ Alt + MMB navigate · Shift precision · Ctrl snap (Shift+Ctrl fine) · Shift+Ta
 wheel/PageUp proportional size · type a number or expression (e.g. 2*3), - negates, Tab next axis (G 1 Tab 2 Enter), = expression mode (2m, 90d, pi/2)</td></tr>
 <tr><td><b>.</b> / <b>,</b></td><td>Pivot pie (median / bounding box / 3D cursor / active / individual) / orientation pie (global / local / normal / view / cursor / parent)</td></tr>
 <tr><td><b>Ctrl + .</b></td><td>Edit origin: move / rotate the pivot freely with the manipulator (Ctrl + . again to finish)</td></tr>
+<tr><td><b>F</b> (object mode) / Numpad .</td><td>Frame selected: the camera zooms to the selection and orbits around it</td></tr>
 <tr><td><b>Shift + Tab</b> / Shift + Ctrl + Tab</td><td>Toggle snapping / snap target (increment, vertex, edge, face). Ctrl inverts it while transforming</td></tr>
 <tr><td><b>Alt + G / R / S</b></td><td>Clear location / rotation / scale</td></tr>
 <tr><td><b>Ctrl + A</b></td><td>Apply (freeze), apply modifiers, delete history, make instances real</td></tr>

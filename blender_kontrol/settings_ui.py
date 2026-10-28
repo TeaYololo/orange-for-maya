@@ -37,6 +37,7 @@ class SettingsDialog(QtWidgets.QDialog):
         'snap_on': 'Snap açık (Shift+Tab)',
         'destructive_edit': 'Edit modunda geçmiş bırakma (Blender gibi)',
         'auto_camera_select': 'Wireframe / X-Ray\'de arkadakileri de seç',
+        'origin_dots': 'Seçili objelerin origin noktasını göster',
     }
     # Onay kutusu etiketi sarmaz: aciklama kutunun altinda soluk satirda ve ipucunda
     NOTES = {
@@ -46,6 +47,8 @@ class SettingsDialog(QtWidgets.QDialog):
         'orbit_selection': 'Görünüm seçimin etrafında döner.',
         'auto_camera_select': 'Solid görünümde yalnız görünenler seçilir; Wireframe ya da X-Ray açılınca '
                               'arkadakiler de (Maya: camera based selection).',
+        'origin_dots': 'Blender gibi seçili objelerin (edit modunda düzenlenen objenin) origin\'i işaretlenir '
+                       '(Maya: pivot göstergesi).',
         'destructive_edit': "F9 bu modda çalışmaz; Orange modifier'lı mesh'lere dokunulmaz.",
     }
     PAGE_LABELS = {
@@ -56,7 +59,7 @@ class SettingsDialog(QtWidgets.QDialog):
         ('interface', ('language', 'space_action'), ('emulate_numpad', 'emulate_3button')),
         ('modeling', ('pivot', 'orientation', 'snap_target'), ('snap_on', 'destructive_edit')),
         ('navigation', ('cursor_orient',), ('zoom_to_mouse', 'orbit_selection')),
-        ('viewport', ('overlay',), ('auto_camera_select',)),
+        ('viewport', ('overlay',), ('auto_camera_select', 'origin_dots')),
     ]
     GROUPS = ['3D Görünüm', 'Outliner', 'UV Editor', 'Graph Editor', 'Diğer']
     CAPTURE_COLOR = QtGui.QColor(232, 163, 61)
